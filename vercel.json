@@ -19,7 +19,7 @@
   "rewrites": [
     {
       "source": "/(.*)",
-      "has": [{ "type": "host", "value": { "pre": "xconsole." } }],
+      "has": [{ "type": "host", "value": { "pre": "console." } }],
       "destination": { "service": "console" }
     },
     { "source": "/(.*)", "destination": { "service": "web" } }

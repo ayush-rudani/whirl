@@ -5,11 +5,11 @@ machine and then in production. Budget about half an hour the first time.
 
 Whirl needs three services to run:
 
-| Service                                | What it does                        | Free tier |
-| -------------------------------------- | ----------------------------------- | --------- |
-| [Convex](https://convex.dev)           | Database, backend functions, crons  | Yes       |
-| [Clerk](https://clerk.com)             | Sign-in and user accounts           | Yes       |
-| [OpenRouter](https://openrouter.ai)    | Every model call                    | Pay as you go |
+| Service                             | What it does                       | Free tier     |
+| ----------------------------------- | ---------------------------------- | ------------- |
+| [Convex](https://convex.dev)        | Database, backend functions, crons | Yes           |
+| [Clerk](https://clerk.com)          | Sign-in and user accounts          | Yes           |
+| [OpenRouter](https://openrouter.ai) | Every model call                   | Pay as you go |
 
 Everything else is optional. [Configuration](configuration.md) lists what
 each extra service unlocks.
@@ -112,11 +112,11 @@ bun run dev
 
 That starts three things side by side:
 
-| Process | Address                                        |
-| ------- | ---------------------------------------------- |
-| Web app | [localhost:3000](http://localhost:3000)        |
-| Console | [localhost:3001](http://localhost:3001)        |
-| Convex  | watches `packages/backend/convex` and pushes   |
+| Process | Address                                      |
+| ------- | -------------------------------------------- |
+| Web app | [localhost:3000](http://localhost:3000)      |
+| Console | [localhost:3001](http://localhost:3001)      |
+| Convex  | watches `packages/backend/convex` and pushes |
 
 Prefer separate terminals? Use `bun run dev:v2`, `bun run dev:console`, and
 `bun run dev:backend`.
@@ -150,13 +150,13 @@ Admins manage the model catalog, integrations, and skills from the console
 Each optional service switches on as soon as its keys are set, and the
 features it powers hide until then:
 
-| To get...              | Set...                                  |
-| ---------------------- | --------------------------------------- |
-| Web search             | `EXA_API_KEY` on Convex                 |
-| Long-term memory       | `SUPERMEMORY_API_KEY` on Convex         |
-| Plans and billing      | `AUTUMN_SECRET_KEY` on Convex           |
-| Product analytics      | PostHog keys on the web app and Convex  |
-| The support agent      | `MEDIAN_KEY` on the web app and Convex  |
+| To get...         | Set...                                 |
+| ----------------- | -------------------------------------- |
+| Web search        | `EXA_API_KEY` on Convex                |
+| Long-term memory  | `SUPERMEMORY_API_KEY` on Convex        |
+| Plans and billing | `AUTUMN_SECRET_KEY` on Convex          |
+| Product analytics | PostHog keys on the web app and Convex |
+| The support agent | `MEDIAN_KEY` on the web app and Convex |
 
 [Configuration](configuration.md) has the full list, including what billing
 expects to find in your Autumn account.
@@ -196,13 +196,13 @@ Any host that runs Next.js works. On [Vercel](https://vercel.com):
    root and the **Services** preset. [`vercel.json`](../vercel.json) deploys
    the web app and the console as
    [Vercel Services](https://vercel.com/docs/services) in one project,
-   routing any host that starts with `xconsole.` to the console and
+   routing any host that starts with `console.` to the console and
    everything else to the web app. Leave the build settings alone. The
    backend deploys to Convex, not Vercel.
 2. Add the environment variables from `apps/v2/.env.example` and
    `apps/console/.env.example`, using your production Convex and Clerk
    values. Set `VITE_APP_URL` to the web app's domain.
-3. Deploy, then add both `your-domain` and `xconsole.your-domain` under
+3. Deploy, then add both `your-domain` and `console.your-domain` under
    **Settings → Domains** and point their DNS at Vercel. Make sure
    `SITE_URL` on Convex matches the web app's domain exactly.
 
@@ -218,7 +218,7 @@ bun run --cwd apps/v2 start
 ### Console (optional)
 
 The console is a static Vite app. On Vercel it ships alongside the web app
-on `xconsole.your-domain`. Elsewhere, build it with `bun run build:console`
+on `console.your-domain`. Elsewhere, build it with `bun run build:console`
 and serve `apps/console/dist` on its own host, falling back to `index.html`.
 Set `VITE_APP_URL` to the web app's address.
 
