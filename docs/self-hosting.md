@@ -193,9 +193,12 @@ picks it up automatically, and skips the deploy in any copy without one.
 Any host that runs Next.js works. On [Vercel](https://vercel.com):
 
 1. Import the repository and set the **root directory** to `apps/v2`.
+   [`apps/v2/vercel.json`](../apps/v2/vercel.json) installs the whole Bun
+   workspace from the repository root, so leave the build settings alone.
 2. Add the environment variables from `apps/v2/.env.example`, using your
    production Convex and Clerk values.
-3. Deploy.
+3. Deploy, then add your domain under **Settings → Domains** and point its
+   DNS at Vercel. Make sure `SITE_URL` on Convex matches it exactly.
 
 On other hosts, also set `NEXT_PUBLIC_SITE_URL` to your public address, then
 build and start from the repository root:
