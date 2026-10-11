@@ -192,11 +192,11 @@ picks it up automatically, and skips the deploy in any copy without one.
 
 Any host that runs Next.js works. On [Vercel](https://vercel.com):
 
-1. Import the repository with the **root directory** left at the repository
-   root. [`vercel.json`](../vercel.json) deploys the web app as a
-   [Vercel Service](https://vercel.com/docs/services) and installs the whole
-   Bun workspace, so leave the build settings alone. The backend deploys to
-   Convex, not Vercel.
+1. Import the repository, set the **root directory** to `apps/v2`, and pick
+   the **Next.js** preset. Ignore the offer to group the apps into Services;
+   the backend deploys to Convex, not Vercel.
+   [`apps/v2/vercel.json`](../apps/v2/vercel.json) installs the whole Bun
+   workspace from the repository root, so leave the build settings alone.
 2. Add the environment variables from `apps/v2/.env.example`, using your
    production Convex and Clerk values.
 3. Deploy, then add your domain under **Settings → Domains** and point its
