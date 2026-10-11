@@ -60,20 +60,22 @@ export function SignInPanel({
     onDone();
   };
 
-  /* Both a real 2FA prompt and Clerk's new-device check (client trust) land
-     here. A new device only ever offers an emailed code, so that's tried
-     before falling back to backup codes. */
+  /* Both a real 2FA prompt and Clerk's new-device check (Device Trust,
+     `needs_client_trust`) land here. Device Trust never offers TOTP or
+     backup codes — only the email or SMS code Clerk is configured to send. */
   const startSecondFactor = async () => {
     const strategies = (signIn.supportedSecondFactors ?? []).map(
       (f) => f.strategy,
     );
-    const next: SecondFactor = strategies.includes("totp")
-      ? "totp"
-      : strategies.includes("phone_code")
-        ? "phone_code"
-        : strategies.includes("email_code")
-          ? "email_code"
-          : "backup_code";
+    const next = (
+      ["totp", "phone_code", "email_code", "backup_code"] as const
+    ).find((s) => strategies.includes(s));
+    if (!next) {
+      setError(
+        "This account needs a verification method we don't support here yet. Try signing in with Google.",
+      );
+      return;
+    }
 
     const { error } =
       next === "phone_code"
@@ -90,6 +92,10 @@ export function SignInPanel({
     setCode("");
     goTo("verify-2fa");
   };
+
+  const offersBackupCode = (signIn.supportedSecondFactors ?? []).some(
+    (f) => f.strategy === "backup_code",
+  );
 
   const needsSecondFactor = () =>
     signIn.status === "needs_second_factor" ||
@@ -140,6 +146,18 @@ export function SignInPanel({
     } else {
       setError("Couldn't verify the code. Try again.");
     }
+    setBusy(false);
+  };
+
+  const handleResendCode = async () => {
+    if (!signIn || busy) return;
+    setError(null);
+    setBusy(true);
+    const { error } =
+      factor === "email_code"
+        ? await signIn.mfa.sendEmailCode()
+        : await signIn.mfa.sendPhoneCode();
+    if (error) setError(describeError(error));
     setBusy(false);
   };
 
@@ -284,17 +302,23 @@ export function SignInPanel({
               autoFocus
               required
             />
-            {factor !== "backup_code" && factor !== "email_code" && (
-              <SubtleAction
-                onClick={() => {
-                  setFactor("backup_code");
-                  setCode("");
-                }}
-                className="-mt-0.5 self-start"
-              >
-                Use a backup code instead
-              </SubtleAction>
-            )}
+            <div className="-mt-0.5 flex justify-between gap-3">
+              {factor !== "backup_code" && offersBackupCode && (
+                <SubtleAction
+                  onClick={() => {
+                    setFactor("backup_code");
+                    setCode("");
+                  }}
+                >
+                  Use a backup code instead
+                </SubtleAction>
+              )}
+              {(factor === "email_code" || factor === "phone_code") && (
+                <SubtleAction onClick={handleResendCode} className="ml-auto">
+                  Send a new code
+                </SubtleAction>
+              )}
+            </div>
             <ErrorNote message={error} />
             <SubmitButton busy={busy}>Verify</SubmitButton>
           </form>
