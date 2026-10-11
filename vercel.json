@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "v2": {
+      "root": "apps/v2",
+      "framework": "nextjs",
+      "installCommand": "cd ../.. && bun install",
+      "buildCommand": "bun run build"
+    }
+  },
+  "rewrites": [{ "source": "/(.*)", "destination": { "service": "v2" } }]
+}

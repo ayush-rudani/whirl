@@ -192,9 +192,11 @@ picks it up automatically, and skips the deploy in any copy without one.
 
 Any host that runs Next.js works. On [Vercel](https://vercel.com):
 
-1. Import the repository and set the **root directory** to `apps/v2`.
-   [`apps/v2/vercel.json`](../apps/v2/vercel.json) installs the whole Bun
-   workspace from the repository root, so leave the build settings alone.
+1. Import the repository with the **root directory** left at the repository
+   root. [`vercel.json`](../vercel.json) deploys the web app as a
+   [Vercel Service](https://vercel.com/docs/services) and installs the whole
+   Bun workspace, so leave the build settings alone. The backend deploys to
+   Convex, not Vercel.
 2. Add the environment variables from `apps/v2/.env.example`, using your
    production Convex and Clerk values.
 3. Deploy, then add your domain under **Settings → Domains** and point its
@@ -212,8 +214,9 @@ bun run --cwd apps/v2 start
 ### Console (optional)
 
 The console is a static Vite app. Build it with `bun run build:console` and
-serve `apps/console/dist`, or import it into Vercel with the root directory
-set to `apps/console`. Set `VITE_APP_URL` to the web app's address.
+serve `apps/console/dist`, or import it into Vercel as its own project with
+the root directory set to `apps/console` and give it a subdomain like
+`console.your-domain`. Set `VITE_APP_URL` to the web app's address.
 
 ## Make it yours
 
