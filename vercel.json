@@ -13,14 +13,15 @@
       "installCommand": "cd ../.. && bun install",
       "buildCommand": "bun run build",
       "outputDirectory": "dist",
-      "rewrites": [
-        { "source": "/console/(.*)", "destination": "/console/index.html" }
-      ]
+      "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
     }
   },
   "rewrites": [
-    { "source": "/console", "destination": { "service": "console" } },
-    { "source": "/console/(.*)", "destination": { "service": "console" } },
+    {
+      "source": "/(.*)",
+      "has": [{ "type": "host", "value": { "pre": "xconsole." } }],
+      "destination": { "service": "console" }
+    },
     { "source": "/(.*)", "destination": { "service": "v2" } }
   ]
 }

@@ -194,14 +194,17 @@ Any host that runs Next.js works. On [Vercel](https://vercel.com):
 
 1. Import the repository with the **root directory** left at the repository
    root and the **Services** preset. [`vercel.json`](../vercel.json) deploys
-   the web app at `/` and the console at `/console` as
-   [Vercel Services](https://vercel.com/docs/services) on one domain, so
-   leave the build settings alone. The backend deploys to Convex, not Vercel.
+   the web app and the console as
+   [Vercel Services](https://vercel.com/docs/services) in one project,
+   routing any host that starts with `xconsole.` to the console and
+   everything else to the web app. Leave the build settings alone. The
+   backend deploys to Convex, not Vercel.
 2. Add the environment variables from `apps/v2/.env.example` and
    `apps/console/.env.example`, using your production Convex and Clerk
-   values. Set `VITE_APP_URL` to your domain.
-3. Deploy, then add your domain under **Settings → Domains** and point its
-   DNS at Vercel. Make sure `SITE_URL` on Convex matches it exactly.
+   values. Set `VITE_APP_URL` to the web app's domain.
+3. Deploy, then add both `your-domain` and `xconsole.your-domain` under
+   **Settings → Domains** and point their DNS at Vercel. Make sure
+   `SITE_URL` on Convex matches the web app's domain exactly.
 
 On other hosts, also set `NEXT_PUBLIC_SITE_URL` to your public address, then
 build and start from the repository root:
@@ -214,11 +217,10 @@ bun run --cwd apps/v2 start
 
 ### Console (optional)
 
-The console is a static Vite app, built to be served under `/console`. On
-Vercel it ships alongside the web app. Elsewhere, build it with
-`bun run build:console` and serve `apps/console/dist` so that
-`/console/...` maps to `dist/console/...`, falling back to
-`dist/console/index.html`. Set `VITE_APP_URL` to the web app's address.
+The console is a static Vite app. On Vercel it ships alongside the web app
+on `xconsole.your-domain`. Elsewhere, build it with `bun run build:console`
+and serve `apps/console/dist` on its own host, falling back to `index.html`.
+Set `VITE_APP_URL` to the web app's address.
 
 ## Make it yours
 
