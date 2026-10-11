@@ -30,7 +30,7 @@ function Root() {
     <AnalyticsProvider>
       <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY!}>
         <ConvexProviderWithClerk client={convex} useAuth={useAuth}>
-          <BrowserRouter>
+          <BrowserRouter basename={import.meta.env.BASE_URL}>
             <App />
           </BrowserRouter>
         </ConvexProviderWithClerk>

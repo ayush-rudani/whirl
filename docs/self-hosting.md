@@ -192,13 +192,14 @@ picks it up automatically, and skips the deploy in any copy without one.
 
 Any host that runs Next.js works. On [Vercel](https://vercel.com):
 
-1. Import the repository, set the **root directory** to `apps/v2`, and pick
-   the **Next.js** preset. Ignore the offer to group the apps into Services;
-   the backend deploys to Convex, not Vercel.
-   [`apps/v2/vercel.json`](../apps/v2/vercel.json) installs the whole Bun
-   workspace from the repository root, so leave the build settings alone.
-2. Add the environment variables from `apps/v2/.env.example`, using your
-   production Convex and Clerk values.
+1. Import the repository with the **root directory** left at the repository
+   root and the **Services** preset. [`vercel.json`](../vercel.json) deploys
+   the web app at `/` and the console at `/console` as
+   [Vercel Services](https://vercel.com/docs/services) on one domain, so
+   leave the build settings alone. The backend deploys to Convex, not Vercel.
+2. Add the environment variables from `apps/v2/.env.example` and
+   `apps/console/.env.example`, using your production Convex and Clerk
+   values. Set `VITE_APP_URL` to your domain.
 3. Deploy, then add your domain under **Settings → Domains** and point its
    DNS at Vercel. Make sure `SITE_URL` on Convex matches it exactly.
 
@@ -213,10 +214,11 @@ bun run --cwd apps/v2 start
 
 ### Console (optional)
 
-The console is a static Vite app. Build it with `bun run build:console` and
-serve `apps/console/dist`, or import it into Vercel as its own project with
-the root directory set to `apps/console` and give it a subdomain like
-`console.your-domain`. Set `VITE_APP_URL` to the web app's address.
+The console is a static Vite app, built to be served under `/console`. On
+Vercel it ships alongside the web app. Elsewhere, build it with
+`bun run build:console` and serve `apps/console/dist` so that
+`/console/...` maps to `dist/console/...`, falling back to
+`dist/console/index.html`. Set `VITE_APP_URL` to the web app's address.
 
 ## Make it yours
 

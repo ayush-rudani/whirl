@@ -1,0 +1,26 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "v2": {
+      "root": "apps/v2",
+      "framework": "nextjs",
+      "installCommand": "cd ../.. && bun install",
+      "buildCommand": "bun run build"
+    },
+    "console": {
+      "root": "apps/console",
+      "framework": "vite",
+      "installCommand": "cd ../.. && bun install",
+      "buildCommand": "bun run build",
+      "outputDirectory": "dist",
+      "rewrites": [
+        { "source": "/console/(.*)", "destination": "/console/index.html" }
+      ]
+    }
+  },
+  "rewrites": [
+    { "source": "/console", "destination": { "service": "console" } },
+    { "source": "/console/(.*)", "destination": { "service": "console" } },
+    { "source": "/(.*)", "destination": { "service": "v2" } }
+  ]
+}

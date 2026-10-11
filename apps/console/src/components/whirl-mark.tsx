@@ -13,7 +13,7 @@ export function WhirlMark({
       style={{ width: dim, height: dim }}
     >
       <img
-        src="/whirl.svg"
+        src={`${import.meta.env.BASE_URL}whirl.svg`}
         alt=""
         aria-hidden
         style={{ width: dim, height: dim }}
