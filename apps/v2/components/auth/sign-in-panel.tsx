@@ -21,7 +21,7 @@ import {
 import { CodeField, IconField, PasswordField } from "./fields";
 
 type Step = "start" | "verify-2fa" | "forgot-email" | "forgot-reset";
-type SecondFactor = "totp" | "phone_code" | "backup_code";
+type SecondFactor = "totp" | "phone_code" | "email_code" | "backup_code";
 
 export function SignInPanel({
   onSwitch,
@@ -60,6 +60,41 @@ export function SignInPanel({
     onDone();
   };
 
+  /* Both a real 2FA prompt and Clerk's new-device check (client trust) land
+     here. A new device only ever offers an emailed code, so that's tried
+     before falling back to backup codes. */
+  const startSecondFactor = async () => {
+    const strategies = (signIn.supportedSecondFactors ?? []).map(
+      (f) => f.strategy,
+    );
+    const next: SecondFactor = strategies.includes("totp")
+      ? "totp"
+      : strategies.includes("phone_code")
+        ? "phone_code"
+        : strategies.includes("email_code")
+          ? "email_code"
+          : "backup_code";
+
+    const { error } =
+      next === "phone_code"
+        ? await signIn.mfa.sendPhoneCode()
+        : next === "email_code"
+          ? await signIn.mfa.sendEmailCode()
+          : { error: null };
+    if (error) {
+      setError(describeError(error));
+      return;
+    }
+
+    setFactor(next);
+    setCode("");
+    goTo("verify-2fa");
+  };
+
+  const needsSecondFactor = () =>
+    signIn.status === "needs_second_factor" ||
+    signIn.status === "needs_client_trust";
+
   const handlePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!signIn || busy) return;
@@ -75,17 +110,8 @@ export function SignInPanel({
 
     if (signIn.status === "complete") {
       await finalize();
-    } else if (signIn.status === "needs_second_factor") {
-      const factors = signIn.supportedSecondFactors ?? [];
-      if (factors.some((f) => f.strategy === "totp")) {
-        setFactor("totp");
-      } else if (factors.some((f) => f.strategy === "phone_code")) {
-        setFactor("phone_code");
-        await signIn.mfa.sendPhoneCode();
-      } else {
-        setFactor("backup_code");
-      }
-      setStep("verify-2fa");
+    } else if (needsSecondFactor()) {
+      await startSecondFactor();
     } else {
       setError("Couldn't finish signing in. Try again.");
     }
@@ -103,7 +129,9 @@ export function SignInPanel({
         ? await signIn.mfa.verifyTOTP({ code })
         : factor === "phone_code"
           ? await signIn.mfa.verifyPhoneCode({ code })
-          : await signIn.mfa.verifyBackupCode({ code });
+          : factor === "email_code"
+            ? await signIn.mfa.verifyEmailCode({ code })
+            : await signIn.mfa.verifyBackupCode({ code });
 
     if (error) {
       setError(describeError(error));
@@ -152,9 +180,8 @@ export function SignInPanel({
       setError(describeError(error));
     } else if (signIn.status === "complete") {
       await finalize();
-    } else if (signIn.status === "needs_second_factor") {
-      setFactor("totp");
-      setStep("verify-2fa");
+    } else if (needsSecondFactor()) {
+      await startSecondFactor();
     } else {
       setError("Couldn't reset the password. Try again.");
     }
@@ -234,13 +261,19 @@ export function SignInPanel({
         <motion.div key="verify-2fa" {...stepMotion}>
           <BackButton onClick={() => goTo("start")} />
           <StepTitle
-            title="Two-factor authentication"
+            title={
+              factor === "email_code"
+                ? "Check your email"
+                : "Two-factor authentication"
+            }
             subtitle={
               factor === "totp"
                 ? "Enter the 6-digit code from your authenticator app."
                 : factor === "phone_code"
                   ? "Enter the code we just sent to your phone."
-                  : "Enter one of your backup codes."
+                  : factor === "email_code"
+                    ? `New device! Enter the code we sent to ${email} to confirm it's you.`
+                    : "Enter one of your backup codes."
             }
           />
           <form onSubmit={handleSecondFactor} className="flex flex-col gap-2.5">
@@ -251,7 +284,7 @@ export function SignInPanel({
               autoFocus
               required
             />
-            {factor !== "backup_code" && (
+            {factor !== "backup_code" && factor !== "email_code" && (
               <SubtleAction
                 onClick={() => {
                   setFactor("backup_code");
