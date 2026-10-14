@@ -108,7 +108,7 @@ console.log(
 await sleep(2500);
 console.log(
   "cached  →",
-  await evaluate(`caches.open("whirl-shell-v1")
+  await evaluate(`caches.open("whirl-shell-v2")
     .then((c) => c.keys())
     .then((keys) => keys.map((r) => new URL(r.url).pathname).join(", "))`),
 );

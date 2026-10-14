@@ -20,14 +20,14 @@
  * it on every navigation.
  */
 
-const CACHE = "whirl-shell-v1";
+const CACHE = "whirl-shell-v2";
 const OFFLINE_URL = "/offline.html";
 
 /* Small, and every one of them outlives a deploy: the font is content-stable
    and the icons are the installed app's own face. */
 const PRECACHE = [
   OFFLINE_URL,
-  "/fonts/InterVariable.woff2",
+  "/fonts/GeistVariable.woff2",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
 ];

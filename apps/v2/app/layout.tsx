@@ -122,13 +122,13 @@ export default function RootLayout({
         {/* The UI face, requested alongside the stylesheet that asks for it
             instead of after it — a font in an @font-face rule isn't
             discoverable until that CSS has parsed. Roman only: italic is
-            rare enough in the app that preloading it would spend 380KB on
+            rare enough in the app that preloading it would spend 73KB on
             most loads to save a swap on few. crossOrigin is not optional
             even same-origin; fonts are always fetched in CORS mode, and
             without it the preload is thrown away and fetched twice. */}
         <link
           rel="preload"
-          href="/fonts/InterVariable.woff2"
+          href="/fonts/GeistVariable.woff2"
           as="font"
           type="font/woff2"
           crossOrigin="anonymous"

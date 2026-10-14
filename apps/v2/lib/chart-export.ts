@@ -22,7 +22,7 @@ const FOOT_SIZE = 11;
 const LINE_GAP = 6;
 const MIN_WIDTH = 420;
 
-/* A serialized SVG carries no stylesheet and so can't reach Inter, which the
+/* A serialized SVG carries no stylesheet and so can't reach Geist, which the
    app loads through an @font-face rule. The export states the system stack
    it will actually fall back to instead.
 
