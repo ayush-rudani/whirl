@@ -149,14 +149,14 @@
   --color-foreground: var(--foreground);
   --color-foreground-soft: var(--foreground-soft);
   --color-border: var(--border);
-  /* Inter, self-hosted (app/fonts.css). Behind it, the OS's own UI face for
+  /* Geist, self-hosted (app/fonts.css). Behind it, the OS's own UI face for
      the moment before the woff2 lands and for the load where it doesn't:
      `system-ui` carries every platform on its own, and the named families
      are for the browsers that don't resolve it. No `ui-sans-serif` — Chrome
      doesn't know the keyword and matches nothing, so it only ever costs a
      lookup. */
   --font-sans:
-    InterVariable, system-ui, -apple-system, "Segoe UI", Roboto,
+    GeistVariable, system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji",
     "Segoe UI Emoji";
   --font-mono:
@@ -312,13 +312,12 @@
    stylesheet outliving the markup that defined its font var looks like, and
    a literal can't do it. Keep in step with --font-sans above.
 
-   The feature settings are rsms.me/inter's own advice: Chrome has shipped
-   builds that leave ligatures and contextual alternates off unless they're
-   asked for by name. */
+   The feature settings name ligatures and contextual alternates outright:
+   Chrome has shipped builds that leave both off unless they're asked for. */
 html,
 body {
   font-family:
-    InterVariable, system-ui, -apple-system, "Segoe UI", Roboto,
+    GeistVariable, system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji",
     "Segoe UI Emoji";
   font-feature-settings:
