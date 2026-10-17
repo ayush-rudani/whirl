@@ -7,6 +7,8 @@ import {
   IconDeviceDesktopFilled,
   IconMoonFilled,
   IconSunFilled,
+  IconViewportNarrow,
+  IconViewportWide,
   type Icon,
 } from "@tabler/icons-react";
 
@@ -15,6 +17,7 @@ import {
   useAutoScrollPref,
   useShowStatsPref,
 } from "@/lib/chat-prefs";
+import { useContentWidth, type ContentWidth } from "@/lib/content-width";
 import { useTheme, type Theme } from "@/lib/theme";
 import { useUnitsPref, type UnitsPref } from "@/lib/units";
 import { ToggleSwitch } from "../toggle-switch";
@@ -28,6 +31,11 @@ const THEME_OPTIONS: { value: Theme; label: string; icon: Icon }[] = [
   { value: "system", label: "System", icon: IconDeviceDesktopFilled },
 ];
 
+const WIDTH_OPTIONS: { value: ContentWidth; label: string; icon: Icon }[] = [
+  { value: "default", label: "Default", icon: IconViewportNarrow },
+  { value: "wide", label: "Wide", icon: IconViewportWide },
+];
+
 const UNITS_OPTIONS: { value: UnitsPref; label: string }[] = [
   { value: "auto", label: "Auto" },
   { value: "metric", label: "Metric" },
@@ -37,6 +45,7 @@ const UNITS_OPTIONS: { value: UnitsPref; label: string }[] = [
 export function GeneralSection() {
   const { user } = useUser();
   const { theme, setTheme } = useTheme();
+  const { width, setWidth } = useContentWidth();
   const { units, setUnits } = useUnitsPref();
   const syncUnits = useMutation(api.userContext.setUnitsSystem);
   const [autoScroll, setAutoScroll] = useAutoScrollPref();
@@ -65,6 +74,17 @@ export function GeneralSection() {
               onChange={setTheme}
               options={THEME_OPTIONS}
               aria-label="Theme"
+            />
+          </SettingsRow>
+          <SettingsRow
+            title="Content width"
+            description="How wide chats stretch on big screens."
+          >
+            <ChoiceCapsules
+              value={width}
+              onChange={setWidth}
+              options={WIDTH_OPTIONS}
+              aria-label="Content width"
             />
           </SettingsRow>
           <SettingsRow

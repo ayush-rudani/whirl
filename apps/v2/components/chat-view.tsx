@@ -594,7 +594,7 @@ export function ChatView({
             !inThread && "top-0 justify-center pb-16",
           )}
         >
-          <div className="mx-auto w-full max-w-2xl">
+          <div className="mx-auto w-full max-w-(--content-width)">
             <AnimatePresence mode="popLayout" initial={false}>
               {!inThread && (
                 <motion.div key="greeting" {...TRIM_FADE}>
