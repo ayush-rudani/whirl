@@ -40,6 +40,8 @@
    away from it, and every hover/press is a lightness move — never a hue.
    Light descends from white; dark climbs from near-black. */
 :root {
+  color-scheme: light;
+  --scrollbar-thumb: rgb(0 0 0 / 0.18);
   --surface: #ffffff;
   /* Hand-mixed translucent popover (frosted menus): bg-popover/70 dies in
      the build — the /alpha color-mix over an @theme-inline var() gets
@@ -234,6 +236,8 @@
 }
 
 .dark {
+  color-scheme: dark;
+  --scrollbar-thumb: rgb(255 255 255 / 0.16);
   /* Dark climbs: the content surface is the floor and everything else
      steps up off it — surface → chrome → well → popover → accent. The rail
      reads as the frame around a recessed page, which is why it lands
@@ -1001,6 +1005,11 @@ body {
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    /* Classic (Windows/Linux) scrollbars get the same quiet look macOS
+       overlay ones have: a thin translucent thumb, no track. Utilities
+       like [scrollbar-width:none] still win — they sit in a later layer. */
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
   }
   body {
     @apply bg-background text-foreground;
