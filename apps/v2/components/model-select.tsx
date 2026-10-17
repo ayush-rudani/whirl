@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -198,9 +199,14 @@ export function ModelSelect({
   thinking,
   onThinkingChange,
   lockedPolicy,
+  onRestWidthChange,
 }: {
   value: string;
   onValueChange: SetModelPref;
+  /** The chip's resting width (padding included), reported whenever it
+   *  changes — so the composer can reserve room for where the chip is
+   *  heading rather than chase its spring frame by frame. */
+  onRestWidthChange?: (width: number) => void;
   /** False when this deployment has no web search: the switch hides. */
   searchAvailable?: boolean;
   /* The gates live in the composer (one source of truth — the command
@@ -298,9 +304,33 @@ export function ModelSelect({
      on. */
   const twinRef = useRef<HTMLSpanElement>(null);
   const [chipWidth, setChipWidth] = useState<number | "auto">("auto");
+  const measureChip = useCallback(() => {
+    const twin = twinRef.current;
+    const trigger = twin?.parentElement;
+    if (!twin || !trigger) return;
+    const width = twin.offsetWidth;
+    setChipWidth(width);
+    if (onRestWidthChange) {
+      const style = getComputedStyle(trigger);
+      onRestWidthChange(
+        width + parseFloat(style.paddingLeft) + parseFloat(style.paddingRight),
+      );
+    }
+  }, [onRestWidthChange]);
+  /* Content changes measure synchronously, so the chip and whatever makes
+     room for it start their springs on the same frame. */
   useLayoutEffect(() => {
-    if (twinRef.current) setChipWidth(twinRef.current.offsetWidth);
-  }, [value, current.name, searchShown, thinkingOn]);
+    measureChip();
+  }, [measureChip, value, current.name, searchShown, thinkingOn]);
+  /* What no prop announces — a web font swapping in — is caught by watching
+     the twin. It never animates, so this only fires on real changes. */
+  useEffect(() => {
+    const twin = twinRef.current;
+    if (!twin) return;
+    const observer = new ResizeObserver(measureChip);
+    observer.observe(twin);
+    return () => observer.disconnect();
+  }, [measureChip]);
 
   /* The popover's height morph: measure whichever view is live (popLayout
      pops the exiting one out of flow) and let the spring chase it. */

@@ -82,8 +82,11 @@ const NO_QUEUED: QueuedTurn[] = [];
 /* gap-1.5 — the breathing room between the text and the pinned controls. */
 const CONTROL_GAP_PX = 6;
 
+/* size-9 — the send button, and so the controls row's height. */
+const CONTROL_SIZE_PX = 36;
+
 /* Height of the controls row the textarea clears while expanded. */
-const CONTROLS_ROW_PX = 36 + CONTROL_GAP_PX;
+const CONTROLS_ROW_PX = CONTROL_SIZE_PX + CONTROL_GAP_PX;
 
 /* Expand shortly before the text reaches the model chip; collapse only
    once it's clearly short again. The window between the two is wider than
@@ -239,9 +242,13 @@ export function Composer({
   const expandedRef = useRef(false);
   const [textHeight, setTextHeight] = useState(36);
   const [insets, setInsets] = useState({ left: 42, right: 138 });
-  /* Width ticks from the ResizeObserver — a re-measure trigger, so the
-     breakpoint tracks sidebar drags and window resizes. */
-  const [contentWidth, setContentWidth] = useState(0);
+  /* Ticks from the ResizeObserver — a re-measure trigger, so the breakpoint
+     tracks sidebar drags, window resizes, and a late web font. */
+  const [layoutTick, setLayoutTick] = useState(0);
+  /* Where the model chip is heading, not where its spring is — so the text
+     makes room on the chip's first frame instead of chasing it. Null until
+     the chip first reports in. */
+  const [chipRestWidth, setChipRestWidth] = useState<number | null>(null);
 
   /* A newline settles the expand decision on its own, which also means the
      width oracle below has nothing to say — so it stops laying the draft
@@ -306,12 +313,16 @@ export function Composer({
      measurement pass downstream of it would then animate the textarea's
      margins and height mid-fade — the flicker this guard exists to stop. */
   useLayoutEffect(() => {
-    const content = contentRef.current;
-    if (!content || !messageBarActive) return;
-    const observer = new ResizeObserver(([entry]) =>
-      setContentWidth(entry.contentRect.width),
-    );
-    observer.observe(content);
+    const watched = [
+      contentRef.current,
+      /* A late web font changes the placeholder's width with nothing else.
+         The controls aren't watched: the chip reports its own resting
+         width, and observing it would tick every frame of its spring. */
+      placeholderMirrorRef.current,
+    ];
+    if (!messageBarActive || watched.some((node) => !node)) return;
+    const observer = new ResizeObserver(() => setLayoutTick((tick) => tick + 1));
+    for (const node of watched) observer.observe(node!);
     return () => observer.disconnect();
   }, [messageBarActive]);
 
@@ -332,7 +343,13 @@ export function Composer({
     if (!el || !content || !textBox || !mirror || !plus || !right) return;
 
     const left = plus.offsetWidth + CONTROL_GAP_PX;
-    const rightZone = right.offsetWidth + CONTROL_GAP_PX;
+    /* The right cluster is the chip, a gap-1.5, and the send button. Its
+       live width is mid-spring whenever the chip just changed, so it's
+       only trusted before the chip has reported where it's going. */
+    const rightZone =
+      chipRestWidth === null
+        ? right.offsetWidth + CONTROL_GAP_PX
+        : chipRestWidth + CONTROL_GAP_PX + CONTROL_SIZE_PX + CONTROL_GAP_PX;
     /* Only when they actually moved (the model chip changing width) — a
        fresh object every keystroke bought an extra render pass for nothing. */
     setInsets((current) =>
@@ -373,7 +390,7 @@ export function Composer({
     textBox.style.marginLeft = prevMarginLeft;
     textBox.style.marginRight = prevMarginRight;
     el.style.height = prevHeight;
-  }, [value, hasBreak, model, placeholder, contentWidth, messageBarActive, ref]);
+  }, [value, hasBreak, chipRestWidth, placeholder, layoutTick, messageBarActive, ref]);
 
   /* Attachments upload as they're picked; validity is model-relative, so
      a chip fine on Heavy can flip to rejected on Free without re-adding.
@@ -1002,6 +1019,7 @@ export function Composer({
                     onSearchOnChange={setSearchOn}
                     thinking={thinking}
                     onThinkingChange={setThinking}
+                    onRestWidthChange={setChipRestWidth}
                     {...(isLocked ? { lockedPolicy } : {})}
                   />
                   <SendButton
