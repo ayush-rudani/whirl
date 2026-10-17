@@ -218,6 +218,7 @@ export function Composer({
   const contentRef = useRef<HTMLDivElement>(null);
   const textBoxRef = useRef<HTMLDivElement>(null);
   const mirrorRef = useRef<HTMLSpanElement>(null);
+  const placeholderMirrorRef = useRef<HTMLSpanElement>(null);
   const plusRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLDivElement>(null);
 
@@ -343,7 +344,15 @@ export function Composer({
     /* clientWidth minus the p-2 frame, minus the textarea's own px-1.5. */
     const fullInner = content.clientWidth - 16 - 12;
     const collapsedInner = fullInner - left - rightZone;
-    const textWidth = mirror.offsetWidth;
+    /* The placeholder counts too: on a narrow screen with a wide model chip,
+       an empty draft would otherwise stay collapsed and wrap "Ask anything"
+       a word (or half a word) per line. Taking the wider of the two also
+       means the first keystroke never collapses a pill the placeholder
+       expanded. */
+    const textWidth = Math.max(
+      mirror.offsetWidth,
+      placeholderMirrorRef.current?.offsetWidth ?? 0,
+    );
     const nextExpanded =
       hasBreak ||
       (expandedRef.current
@@ -364,7 +373,7 @@ export function Composer({
     textBox.style.marginLeft = prevMarginLeft;
     textBox.style.marginRight = prevMarginRight;
     el.style.height = prevHeight;
-  }, [value, hasBreak, model, contentWidth, messageBarActive, ref]);
+  }, [value, hasBreak, model, placeholder, contentWidth, messageBarActive, ref]);
 
   /* Attachments upload as they're picked; validity is model-relative, so
      a chip fine on Heavy can flip to rejected on Free without re-adding.
@@ -966,6 +975,13 @@ export function Composer({
                   className="invisible absolute top-0 left-0 block w-max px-1.5 field-text whitespace-pre"
                 >
                   {hasBreak ? "" : value}
+                </span>
+                <span
+                  ref={placeholderMirrorRef}
+                  aria-hidden
+                  className="invisible absolute top-0 left-0 block w-max px-1.5 field-text whitespace-pre"
+                >
+                  {placeholder}
                 </span>
                 <div ref={plusRef} className="absolute bottom-2 left-2">
                   <AttachMenu
