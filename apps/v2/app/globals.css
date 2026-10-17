@@ -20,6 +20,18 @@
    collapsed layout is pure CSS and survives reloads without a flash. */
 @custom-variant sidebar-collapsed (&:where([data-sidebar-collapsed], [data-sidebar-collapsed] *));
 
+/* The reading column — transcript and composer dock share one width so
+   they always line up. Widened by the "Content width" setting through a
+   data-content-width attribute on <html> (set pre-paint by the layout
+   script, toggled by lib/content-width.ts), so the pick survives reloads
+   without a flash. Default matches the old max-w-2xl. */
+:root {
+  --content-width: 42rem;
+}
+:root[data-content-width="wide"] {
+  --content-width: 56rem;
+}
+
 /* Touch-first devices — no hover to reveal things with, so hover-gated
    affordances (row ⋯ menus, message action icons) stay visible. Same query
    as lib/coarse-pointer.ts; keep the two in step. */

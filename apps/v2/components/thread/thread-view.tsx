@@ -121,7 +121,7 @@ export function ThreadView({
                 >
                   <MessageScrollerContent
                     className={cn(
-                      "mx-auto w-full max-w-2xl pt-8 pb-[max(11rem,calc(var(--dock-clearance,0px)+0.75rem))]",
+                      "mx-auto w-full max-w-(--content-width) pt-8 pb-[max(11rem,calc(var(--dock-clearance,0px)+0.75rem))]",
                       contentClassName,
                     )}
                   >

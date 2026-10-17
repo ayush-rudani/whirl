@@ -6,6 +6,7 @@ import { ThemeColor } from "@/components/pwa/theme-color";
 import { SupportMount } from "@/components/support/support-mount";
 import { WebVitals } from "@/lib/axiom/client";
 import {
+  CONTENT_WIDTH_BOOT_SCRIPT,
   SIDEBAR_BOOT_SCRIPT,
   THEME_BOOT_SCRIPT,
   TINT_BOOT_SCRIPT,
@@ -133,15 +134,19 @@ export default function RootLayout({
           type="font/woff2"
           crossOrigin="anonymous"
         />
-        {/* Stored theme, accent, canvas tint and sidebar geometry, painted
-            during HTML parsing so a dark-mode load never flashes light, a
-            grape build never flashes graphite, a tinted canvas never
-            flashes neutral, and the shell never jumps width. The scripts
-            themselves are fixed strings in lib/boot-scripts.ts — see the
-            note there on why that matters. */}
+        {/* Stored theme, accent, canvas tint, sidebar geometry and reading
+            width, painted during HTML parsing so a dark-mode load never
+            flashes light, a grape build never flashes graphite, a tinted
+            canvas never flashes neutral, and neither the shell nor the
+            transcript ever jumps width. The scripts themselves are fixed
+            strings in lib/boot-scripts.ts — see the note there on why that
+            matters. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
         <script dangerouslySetInnerHTML={{ __html: TINT_BOOT_SCRIPT }} />
         <script dangerouslySetInnerHTML={{ __html: SIDEBAR_BOOT_SCRIPT }} />
+        <script
+          dangerouslySetInnerHTML={{ __html: CONTENT_WIDTH_BOOT_SCRIPT }}
+        />
       </head>
       <body className="h-full">
         <WebVitals />
