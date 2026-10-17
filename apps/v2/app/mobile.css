@@ -31,11 +31,11 @@
  *
  * Scoped twice over. To pages that actually mount the shell, because the
  * marketing routes and the public share viewer share this document and are
- * ordinary scrolling pages. And to touch, because `overflow: hidden` on
- * <html> takes the document out of scroll-container territory, which quietly
- * cancels the `scrollbar-gutter: stable` reserved in globals.css — on a
- * desktop with classic scrollbars that is a 15px lurch the moment the shell
- * mounts, in aid of a problem desktop doesn't have. */
+ * ordinary scrolling pages. And to touch, because rubber-banding and
+ * pull-to-refresh are problems desktop doesn't have. The document's
+ * scrollbar gutter is already dropped under the shell in globals.css, and
+ * that rule owns the one width shift it costs — don't add a second source
+ * of layout change here on desktop. */
 @media (hover: none) and (pointer: coarse) {
   html:has(.app-frame),
   body:has(.app-frame) {
