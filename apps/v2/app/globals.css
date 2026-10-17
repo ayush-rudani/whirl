@@ -1022,4 +1022,15 @@ body {
        own scrollbar-gutter utilities. */
     scrollbar-gutter: stable;
   }
+  /* …except under the app shell, which is exactly one viewport tall and
+     scrolls in its panes. There the reserved lane never fills — with
+     classic scrollbars it's an empty ~11px strip that doubles the frame's
+     right gap against its top and bottom. macOS overlays reserve nothing,
+     which is why it only showed up on Windows.
+     The trade: crossing to /pricing or /platinum (the only routes whose
+     document really scrolls) now gains or loses that lane, so anything
+     fixed that survives the hop — the support panel — shifts ~11px. */
+  html:has(.app-frame) {
+    scrollbar-gutter: auto;
+  }
 }
