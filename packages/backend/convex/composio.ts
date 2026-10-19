@@ -85,6 +85,10 @@ async function composioFetch(
   return json;
 }
 
+function isEmptyArray(value: unknown): boolean {
+  return Array.isArray(value) && value.length === 0;
+}
+
 function firstString(...values: unknown[]): string | undefined {
   for (const value of values) {
     if (typeof value === "string" && value.trim()) return value.trim();
@@ -376,6 +380,63 @@ function composioServerName(slug: string): string {
   return cleaned.length >= 4 ? cleaned : `whirl srv`;
 }
 
+/** How a toolkit authenticates, read off Composio's toolkit detail. The detail
+ * endpoint doesn't always send `no_auth`, so an empty `auth_config_details`
+ * counts too. "unknown" means Composio didn't say — we try and let it judge. */
+function toolkitAuthKind(
+  toolkit: Record<string, unknown>,
+): "none" | "managed" | "unmanaged" | "unknown" {
+  if (toolkit.no_auth === true || isEmptyArray(toolkit.auth_config_details)) {
+    return "none";
+  }
+  // Same signal the catalog card reads, so the UI and this gate agree.
+  const schemes = toolkit.composio_managed_auth_schemes;
+  if (!Array.isArray(schemes)) return "unknown";
+  return schemes.length > 0 ? "managed" : "unmanaged";
+}
+
+function unmanagedAuthError(name: string): Error {
+  return new Error(
+    `${name} needs its own OAuth app — Composio doesn't manage credentials for it, so it can't be added from here yet.`,
+  );
+}
+
+/**
+ * Create the Composio-managed auth config for a toolkit. Returns null when
+ * Composio says the toolkit needs no auth after all (our detail read can miss
+ * that), and turns "no managed credentials" into an error admins can act on.
+ */
+async function createManagedAuthConfig(
+  slug: string,
+  name: string,
+): Promise<string | null> {
+  let authJson: Record<string, unknown>;
+  try {
+    authJson = await composioFetch(`/api/v3/auth_configs`, {
+      method: "POST",
+      body: {
+        toolkit: { slug },
+        auth_config: { type: "use_composio_managed_auth" },
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (/does not require authentication/i.test(message)) return null;
+    if (/managed credentials|default auth config not found/i.test(message)) {
+      throw unmanagedAuthError(name);
+    }
+    throw error;
+  }
+  const authConfigId = firstString(
+    (authJson.auth_config as Record<string, unknown> | undefined)?.id,
+    authJson.id,
+  );
+  if (!authConfigId) {
+    throw new Error("Composio didn't return an auth config id.");
+  }
+  return authConfigId;
+}
+
 /**
  * Add one Composio toolkit to the integration store. Provisions the Composio
  * side first (managed auth config, then a single-toolkit MCP server), and
@@ -406,7 +467,10 @@ export const addToolkit = action({
     const description = firstString(meta.description, toolkit.description)
       ?.slice(0, MAX_DESCRIPTION_LENGTH);
     const logoUrl = firstString(meta.logo, toolkit.logo);
-    const noAuth = toolkit.no_auth === true;
+    const authKind = toolkitAuthKind(toolkit);
+    // Bail before provisioning anything: without managed credentials every
+    // user would need our own OAuth app, which this flow can't set up.
+    if (authKind === "unmanaged") throw unmanagedAuthError(name);
 
     // The toolkit's tools become the listing's status phrases, and cap what
     // the MCP server may expose (Whirl's runtime reads at most 40 anyway).
@@ -431,22 +495,12 @@ export const addToolkit = action({
       .filter((t): t is NonNullable<typeof t> => t !== null)
       .slice(0, MAX_TOOLS_PER_EXTENSION);
 
-    // Composio-managed auth: Composio's own OAuth app / key handling. Where a
-    // toolkit doesn't offer it, Composio errors here and the admin sees why.
-    const authJson = await composioFetch(`/api/v3/auth_configs`, {
-      method: "POST",
-      body: {
-        toolkit: { slug },
-        auth_config: { type: "use_composio_managed_auth" },
-      },
-    });
-    const authConfigId = firstString(
-      (authJson.auth_config as Record<string, unknown> | undefined)?.id,
-      authJson.id,
-    );
-    if (!authConfigId) {
-      throw new Error("Composio didn't return an auth config id.");
-    }
+    // Composio-managed auth: Composio's own OAuth app / key handling. No-auth
+    // toolkits skip it — Composio refuses to make an auth config for them —
+    // and ride on the MCP server's `no_auth_apps` list instead.
+    const authConfigId =
+      authKind === "none" ? null : await createManagedAuthConfig(slug, name);
+    const noAuth = authConfigId === null;
 
     let mcpServerId: string | undefined;
     try {
@@ -463,7 +517,8 @@ export const addToolkit = action({
             method: "POST",
             body: {
               name: composioServerName(slug),
-              auth_config_ids: [authConfigId],
+              auth_config_ids: authConfigId ? [authConfigId] : [],
+              ...(noAuth ? { no_auth_apps: [slug] } : {}),
               ...(allowedTools.length > 0
                 ? { allowed_tools: allowedTools }
                 : {}),
@@ -515,7 +570,7 @@ export const addToolkit = action({
           logoUrl,
           mcpUrl,
           tools: listedTools,
-          authConfigId,
+          authConfigId: authConfigId ?? undefined,
           mcpServerId,
           noAuth,
         },
@@ -529,10 +584,12 @@ export const addToolkit = action({
           { method: "DELETE" },
         ).catch(() => {});
       }
-      await composioFetch(
-        `/api/v3/auth_configs/${encodeURIComponent(authConfigId)}`,
-        { method: "DELETE" },
-      ).catch(() => {});
+      if (authConfigId) {
+        await composioFetch(
+          `/api/v3/auth_configs/${encodeURIComponent(authConfigId)}`,
+          { method: "DELETE" },
+        ).catch(() => {});
+      }
       throw error;
     }
   },
@@ -552,7 +609,7 @@ export const insertListing = internalMutation({
         completed: v.string(),
       }),
     ),
-    authConfigId: v.string(),
+    authConfigId: v.optional(v.string()),
     mcpServerId: v.string(),
     noAuth: v.boolean(),
   },
@@ -617,10 +674,13 @@ export const removeToolkit = action({
       `/api/v3/mcp/servers/${encodeURIComponent(row.composio.mcpServerId)}`,
       { method: "DELETE" },
     ).catch(() => {});
-    await composioFetch(
-      `/api/v3/auth_configs/${encodeURIComponent(row.composio.authConfigId)}`,
-      { method: "DELETE" },
-    ).catch(() => {});
+    const { authConfigId } = row.composio;
+    if (authConfigId) {
+      await composioFetch(
+        `/api/v3/auth_configs/${encodeURIComponent(authConfigId)}`,
+        { method: "DELETE" },
+      ).catch(() => {});
+    }
     await ctx.runMutation(internal.composio.removeListing, { id: args.id });
     return null;
   },
