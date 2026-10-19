@@ -111,11 +111,11 @@ function listItems(json: Record<string, unknown>): Record<string, unknown>[] {
 
 type ToolkitAuthKind = "none" | "managed" | "unmanaged" | "unknown";
 
-/** How a toolkit authenticates. Shared by the catalog card and addToolkit so
- * the button and the backend gate never disagree. Composio's list and detail
- * endpoints describe auth with different (often optional) fields, so a toolkit
- * counts as no-auth on any empty auth list, and "unknown" means Composio
- * didn't say — addToolkit tries and lets Composio judge. */
+/** How a toolkit authenticates. Composio's list and detail endpoints describe
+ * auth with different (often optional) fields, so a toolkit counts as no-auth
+ * on any empty auth list. "unmanaged" is only trustworthy from the list
+ * endpoint (it carries `no_auth`), which is why it gates the catalog button
+ * but never addToolkit — there Composio's own reply has the final say. */
 function toolkitAuthKind(toolkit: Record<string, unknown>): ToolkitAuthKind {
   if (
     toolkit.no_auth === true ||
@@ -469,10 +469,10 @@ export const addToolkit = action({
     const description = firstString(meta.description, toolkit.description)
       ?.slice(0, MAX_DESCRIPTION_LENGTH);
     const logoUrl = firstString(meta.logo, toolkit.logo);
+    // The detail endpoint has no `no_auth` flag, so a no-auth toolkit and one
+    // without managed credentials look alike here. Only a clear "none" skips
+    // the auth config; everything else asks Composio, whose answer settles it.
     const authKind = toolkitAuthKind(toolkit);
-    // Bail before provisioning anything: without managed credentials every
-    // user would need our own OAuth app, which this flow can't set up.
-    if (authKind === "unmanaged") throw unmanagedAuthError(name);
 
     // The toolkit's tools become the listing's status phrases, and cap what
     // the MCP server may expose (Whirl's runtime reads at most 40 anyway).
