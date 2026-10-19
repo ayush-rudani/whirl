@@ -109,6 +109,26 @@ function listItems(json: Record<string, unknown>): Record<string, unknown>[] {
 
 // --- Catalog parsing ----------------------------------------------------------
 
+type ToolkitAuthKind = "none" | "managed" | "unmanaged" | "unknown";
+
+/** How a toolkit authenticates. Shared by the catalog card and addToolkit so
+ * the button and the backend gate never disagree. Composio's list and detail
+ * endpoints describe auth with different (often optional) fields, so a toolkit
+ * counts as no-auth on any empty auth list, and "unknown" means Composio
+ * didn't say — addToolkit tries and lets Composio judge. */
+function toolkitAuthKind(toolkit: Record<string, unknown>): ToolkitAuthKind {
+  if (
+    toolkit.no_auth === true ||
+    isEmptyArray(toolkit.auth_schemes) ||
+    isEmptyArray(toolkit.auth_config_details)
+  ) {
+    return "none";
+  }
+  const schemes = toolkit.composio_managed_auth_schemes;
+  if (!Array.isArray(schemes)) return "unknown";
+  return schemes.length > 0 ? "managed" : "unmanaged";
+}
+
 type CatalogToolkit = {
   slug: string;
   name: string;
@@ -116,8 +136,7 @@ type CatalogToolkit = {
   logoUrl: string | null;
   categories: string[];
   toolCount: number | null;
-  noAuth: boolean;
-  managedAuth: boolean;
+  authKind: ToolkitAuthKind;
   added: boolean;
 };
 
@@ -138,7 +157,6 @@ function toCatalogToolkit(
         .filter((c): c is string => Boolean(c))
         .slice(0, 3)
     : [];
-  const managedSchemes = item.composio_managed_auth_schemes;
   return {
     slug,
     name: firstString(item.name) ?? slug,
@@ -146,8 +164,7 @@ function toCatalogToolkit(
     logoUrl: firstString(meta.logo, item.logo) ?? null,
     categories,
     toolCount: typeof meta.tools_count === "number" ? meta.tools_count : null,
-    noAuth: item.no_auth === true,
-    managedAuth: Array.isArray(managedSchemes) && managedSchemes.length > 0,
+    authKind: toolkitAuthKind(item),
     added: addedSlugs.has(slug),
   };
 }
@@ -378,21 +395,6 @@ function composioServerName(slug: string): string {
     .slice(0, 30)
     .trim();
   return cleaned.length >= 4 ? cleaned : `whirl srv`;
-}
-
-/** How a toolkit authenticates, read off Composio's toolkit detail. The detail
- * endpoint doesn't always send `no_auth`, so an empty `auth_config_details`
- * counts too. "unknown" means Composio didn't say — we try and let it judge. */
-function toolkitAuthKind(
-  toolkit: Record<string, unknown>,
-): "none" | "managed" | "unmanaged" | "unknown" {
-  if (toolkit.no_auth === true || isEmptyArray(toolkit.auth_config_details)) {
-    return "none";
-  }
-  // Same signal the catalog card reads, so the UI and this gate agree.
-  const schemes = toolkit.composio_managed_auth_schemes;
-  if (!Array.isArray(schemes)) return "unknown";
-  return schemes.length > 0 ? "managed" : "unmanaged";
 }
 
 function unmanagedAuthError(name: string): Error {

@@ -82,7 +82,7 @@ export function ToolkitCatalog({ addedSlugs }: { addedSlugs: Set<string> }) {
       capture(CONSOLE_EVENTS.composioToolkitAdded, {
         slug: toolkit.slug,
         toolCount: toolkit.toolCount,
-        managedAuth: toolkit.managedAuth,
+        managedAuth: toolkit.authKind === "managed",
       });
     } catch (err) {
       setAddError({
@@ -164,7 +164,7 @@ function ToolkitCard({
   const facts = toolkit.categories.slice(0, 3);
   // Without Composio-managed credentials every user would need our own OAuth
   // app, which this flow can't provision — so these stay browse-only.
-  const needsCustomAuth = !toolkit.managedAuth && !toolkit.noAuth;
+  const needsCustomAuth = toolkit.authKind === "unmanaged";
 
   return (
     <li className="flex flex-col gap-3 rounded-2xl border border-black/[0.06] bg-white p-4 dark:border-white/[0.06] dark:bg-[#1B1B1B]">
