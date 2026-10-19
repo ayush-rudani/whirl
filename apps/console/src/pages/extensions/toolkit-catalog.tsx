@@ -1,6 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { useAction } from "convex/react";
-import { IconCheck, IconPlus, IconSearch } from "@tabler/icons-react";
+import {
+  IconCheck,
+  IconLockFilled,
+  IconPlus,
+  IconSearch,
+} from "@tabler/icons-react";
 
 import { Skeleton } from "~/components/skeleton";
 import { Spinner } from "~/components/spinner";
@@ -77,7 +82,7 @@ export function ToolkitCatalog({ addedSlugs }: { addedSlugs: Set<string> }) {
       capture(CONSOLE_EVENTS.composioToolkitAdded, {
         slug: toolkit.slug,
         toolCount: toolkit.toolCount,
-        managedAuth: toolkit.managedAuth,
+        managedAuth: toolkit.authKind === "managed",
       });
     } catch (err) {
       setAddError({
@@ -157,6 +162,9 @@ function ToolkitCard({
   // tools endpoint actually serves. Real counts show up once a toolkit is
   // added, sourced from the live tools list.
   const facts = toolkit.categories.slice(0, 3);
+  // Without Composio-managed credentials every user would need our own OAuth
+  // app, which this flow can't provision — so these stay browse-only.
+  const needsCustomAuth = toolkit.authKind === "unmanaged";
 
   return (
     <li className="flex flex-col gap-3 rounded-2xl border border-black/[0.06] bg-white p-4 dark:border-white/[0.06] dark:bg-[#1B1B1B]">
@@ -174,9 +182,9 @@ function ToolkitCard({
             {facts.length > 0 ? facts.join(" · ") : toolkit.slug}
           </span>
         </div>
-        {!toolkit.managedAuth && !toolkit.noAuth && (
+        {needsCustomAuth && (
           <span
-            title="Composio doesn't offer managed auth for this toolkit — adding it may require custom OAuth credentials."
+            title="Composio doesn't manage credentials for this toolkit, so it needs its own OAuth app and can't be added from here yet."
             className="ml-auto shrink-0 rounded-full bg-amber-500/[0.12] px-2 py-0.5 text-[10.5px] font-medium text-amber-700 dark:bg-amber-500/[0.15] dark:text-amber-300"
           >
             Custom auth
@@ -196,6 +204,11 @@ function ToolkitCard({
           <span className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-black/[0.04] px-3 text-[12.5px] font-medium text-neutral-500 dark:bg-white/[0.06] dark:text-neutral-400">
             <IconCheck size={14} stroke={2.5} />
             Added
+          </span>
+        ) : needsCustomAuth ? (
+          <span className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-black/[0.04] px-3 text-[12.5px] font-medium text-neutral-500 dark:bg-white/[0.06] dark:text-neutral-400">
+            <IconLockFilled size={13} />
+            Not available yet
           </span>
         ) : (
           <button
