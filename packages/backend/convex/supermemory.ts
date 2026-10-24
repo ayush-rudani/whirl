@@ -42,12 +42,6 @@ type SupermemorySearchResponse = {
 type SupermemorySearchResult = {
   memory?: unknown;
   chunk?: unknown;
-  content?: unknown;
-  included?: {
-    document?: {
-      content?: unknown;
-    };
-  };
 };
 
 function supermemoryApiKey() {
@@ -108,12 +102,7 @@ function profileList(value: unknown) {
 function memoryFromSearchResult(result: unknown) {
   if (!result || typeof result !== "object") return null;
   const row = result as SupermemorySearchResult;
-  return (
-    cleanText(row.memory) ??
-    cleanText(row.chunk) ??
-    cleanText(row.content) ??
-    cleanText(row.included?.document?.content)
-  );
+  return cleanText(row.memory) ?? cleanText(row.chunk);
 }
 
 function searchResultList(value: unknown) {
@@ -204,9 +193,10 @@ export async function fetchSupermemoryPromptContext({
   // path — a cold isolate can't afford the extra round trip.
   //
   // v5's profile no longer takes a query, so the query-matched memories come
-  // from a separate search. Both run at once to keep the hot path one trip.
+  // from a separate search. Both run at once to keep the hot path one trip,
+  // and either one failing still leaves the prompt the other half.
   const trimmed = query.trim();
-  const [profile, search] = await Promise.all([
+  const [profileResult, searchResult] = await Promise.allSettled([
     supermemoryRequest<SupermemoryProfileResponse>({
       path: supermemoryNamespacePath(namespace, "/profile"),
       method: "POST",
@@ -224,6 +214,22 @@ export async function fetchSupermemoryPromptContext({
         })
       : null,
   ]);
+
+  if (
+    profileResult.status === "rejected" &&
+    searchResult.status === "rejected"
+  ) {
+    throw profileResult.reason;
+  }
+  for (const result of [profileResult, searchResult]) {
+    if (result.status === "rejected") {
+      console.warn("[supermemory] partial prompt context", result.reason);
+    }
+  }
+  const profile =
+    profileResult.status === "fulfilled" ? profileResult.value : null;
+  const search =
+    searchResult.status === "fulfilled" ? searchResult.value : null;
 
   return {
     staticFacts: profileList(profile?.profile?.static),

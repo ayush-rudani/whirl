@@ -9,7 +9,9 @@ import { supermemoryNamespacePath, supermemoryRequest } from "./supermemory";
  *
  * v5 chunk search answers one result per chunk — `{ chunk, metadata,
  * included: { document }, system }` — rather than v3's one result per document
- * with a `chunks` array, so hits are regrouped by document here.
+ * with a `chunks` array, so hits are regrouped by document here. The result's
+ * own `metadata` is always an object but isn't documented to carry the
+ * document's, so the thread id is read from either.
  */
 
 const RESULT_LIMIT = 8;
@@ -37,7 +39,6 @@ type SearchDocument = {
 
 type SearchResult = {
   chunk?: unknown;
-  documentId?: unknown;
   metadata?: SearchMetadata;
   included?: { document?: SearchDocument };
   system?: { createdAt?: unknown };
@@ -75,10 +76,11 @@ function asTimestamp(value: unknown): number | null {
   return null;
 }
 
-function sentAtOf(result: SearchResult, metadata: SearchMetadata) {
+function sentAtOf(result: SearchResult) {
   const document = result.included?.document;
   return (
-    asTimestamp(metadata.createdAt) ??
+    asTimestamp(result.metadata?.createdAt) ??
+    asTimestamp(document?.metadata?.createdAt) ??
     asTimestamp(document?.system?.createdAt) ??
     asTimestamp(document?.createdAt) ??
     asTimestamp(result.system?.createdAt)
@@ -119,9 +121,8 @@ export async function searchSupermemoryConversations({
     if (!raw || typeof raw !== "object") continue;
     const result = raw as SearchResult;
     const document = result.included?.document;
-    const metadata = result.metadata ?? document?.metadata ?? {};
 
-    const threadId = metadata.threadId;
+    const threadId = result.metadata?.threadId ?? document?.metadata?.threadId;
     if (typeof threadId !== "string" || !threadId) continue;
     if (excludeThreadId && threadId === excludeThreadId) continue;
 
@@ -129,11 +130,7 @@ export async function searchSupermemoryConversations({
     if (!text) continue;
 
     const documentId =
-      typeof document?.id === "string"
-        ? document.id
-        : typeof result.documentId === "string"
-          ? result.documentId
-          : threadId;
+      typeof document?.id === "string" ? document.id : threadId;
 
     const hit = byDocument.get(documentId);
     if (hit) {
@@ -141,7 +138,7 @@ export async function searchSupermemoryConversations({
     } else {
       byDocument.set(documentId, {
         threadId,
-        sentAt: sentAtOf(result, metadata),
+        sentAt: sentAtOf(result),
         parts: [text],
       });
     }
