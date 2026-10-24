@@ -79,7 +79,7 @@ async function prepare() {
       unmetered: false,
       incognito: true,
       memoryActive: false,
-      memoryContainerTag: "test",
+      memoryNamespace: "test",
       usageFactor: 1,
       scaleFreeMessages: false,
       thinking: false,

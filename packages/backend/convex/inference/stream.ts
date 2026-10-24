@@ -126,7 +126,7 @@ import { StepOutputBuffer } from "./stepOutput";
 import {
   fetchSupermemoryPromptContext,
   isSupermemoryConfigured,
-  supermemoryContainerTagForUser,
+  supermemoryNamespaceForUser,
   type SupermemoryPromptContext,
 } from "../supermemory";
 import { searchSupermemoryConversations } from "../supermemorySearch";
@@ -137,7 +137,7 @@ import {
   estimatePromptContentTokens,
 } from "./finalize";
 
-// Replayed live 2026-08-09: a warm /v4/profile answers in ~1.4s and a cold
+// Replayed live 2026-08-09 (v4): a warm profile lookup answers in ~1.4s and a cold
 // isolate runs slower still, so anything tighter than this quietly starved
 // every turn of its memory context (the old 1.2s cap meant the lookup lost
 // the race essentially always). The lookup starts before the gate checks and
@@ -443,7 +443,7 @@ export async function runAssistantTurn(
     requestInfo.memoryEnabled &&
     !requestInfo.incognito &&
     isSupermemoryConfigured();
-  const memoryContainerTag = supermemoryContainerTagForUser(customerId);
+  const memoryNamespace = supermemoryNamespaceForUser(customerId);
 
   // Kick off the memory lookup now — it's a slow external round trip (up to
   // MEMORY_LOOKUP_TIMEOUT_MS) that the prompt needs, but nothing before the
@@ -455,7 +455,7 @@ export async function runAssistantTurn(
     ? bestEffort(
         "Supermemory prompt lookup",
         fetchSupermemoryPromptContext({
-          containerTag: memoryContainerTag,
+          namespace: memoryNamespace,
           query: requestInfo.latestUserText,
         }),
         MEMORY_LOOKUP_TIMEOUT_MS,
@@ -1679,7 +1679,7 @@ export async function runAssistantTurn(
               unmetered: false,
               incognito: requestInfo.incognito,
               memoryActive,
-              memoryContainerTag,
+              memoryNamespace,
               usageFactor,
               scaleFreeMessages,
               thinking: false,
@@ -2097,7 +2097,7 @@ export async function runAssistantTurn(
               unmetered: unmeteredTurn,
               incognito: requestInfo.incognito,
               memoryActive,
-              memoryContainerTag,
+              memoryNamespace,
               usageFactor,
               scaleFreeMessages,
               thinking: requestInfo.thinking,
@@ -2302,7 +2302,7 @@ export async function runAssistantTurn(
                 let hits;
                 try {
                   hits = await searchSupermemoryConversations({
-                    containerTag: memoryContainerTag,
+                    namespace: memoryNamespace,
                     query,
                     excludeThreadId: requestInfo.threadId,
                   });
