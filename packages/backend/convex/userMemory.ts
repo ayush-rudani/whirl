@@ -10,7 +10,7 @@ import {
 import { isPaidCustomer } from "./inference/billing";
 import {
   isSupermemoryConfigured,
-  supermemoryContainerTagForUser,
+  supermemoryNamespaceForUser,
 } from "./supermemory";
 import {
   addSupermemoryMemory,
@@ -20,7 +20,7 @@ import {
   listSupermemorySources,
   MAX_MEMORY_CONTENT,
   updateSupermemoryMemory,
-  wipeSupermemoryContainer,
+  wipeSupermemoryNamespace,
   type MemoryEntry,
   type MemorySourcePage,
 } from "./supermemoryManage";
@@ -47,13 +47,13 @@ export type MemorySourceView = {
 };
 
 /**
- * Resolve the container tag for the signed-in, paying caller. Throws
+ * Resolve the Supermemory namespace for the signed-in, paying caller. Throws
  * `ConvexError`s the client can show verbatim — the settings surface turns
  * `error.data` straight into a toast.
  */
 async function requireMemoryAccess(ctx: ActionCtx): Promise<{
   userId: string;
-  containerTag: string;
+  namespace: string;
 }> {
   const identity = await ctx.auth.getUserIdentity();
   if (!identity) {
@@ -77,7 +77,7 @@ async function requireMemoryAccess(ctx: ActionCtx): Promise<{
 
   return {
     userId: identity.subject,
-    containerTag: supermemoryContainerTagForUser(identity.subject),
+    namespace: supermemoryNamespaceForUser(identity.subject),
   };
 }
 
@@ -124,28 +124,24 @@ export const listMemories = action({
   handler: async (
     ctx,
   ): Promise<{ memories: MemoryEntry[]; totalItems: number }> => {
-    const { containerTag } = await requireMemoryAccess(ctx);
+    const { namespace } = await requireMemoryAccess(ctx);
     try {
-      return await listSupermemoryMemories(containerTag);
+      return await listSupermemoryMemories(namespace);
     } catch (error) {
       rethrowFriendly(error, "Couldn't load your memories. Try again.");
     }
   },
 });
 
-/** Save a memory the user wrote by hand, echoing back the stored row so the
- *  list can splice it in without a refetch. */
+/** Save a memory the user wrote by hand. Supermemory answers with the
+ *  ingested document rather than the memory, so the client refetches. */
 export const addMemory = action({
-  args: { content: v.string(), isStatic: v.optional(v.boolean()) },
-  handler: async (ctx, { content, isStatic }): Promise<MemoryEntry | null> => {
-    const { containerTag } = await requireMemoryAccess(ctx);
+  args: { content: v.string() },
+  handler: async (ctx, { content }): Promise<MemoryEntry | null> => {
+    const { namespace } = await requireMemoryAccess(ctx);
     const text = requireContent(content);
     try {
-      return await addSupermemoryMemory({
-        containerTag,
-        content: text,
-        isStatic: isStatic ?? false,
-      });
+      return await addSupermemoryMemory({ namespace, content: text });
     } catch (error) {
       rethrowFriendly(error, "Couldn't save that memory. Try again.");
     }
@@ -156,10 +152,10 @@ export const addMemory = action({
 export const editMemory = action({
   args: { id: v.string(), content: v.string() },
   handler: async (ctx, { id, content }): Promise<MemoryEntry | null> => {
-    const { containerTag } = await requireMemoryAccess(ctx);
+    const { namespace } = await requireMemoryAccess(ctx);
     const text = requireContent(content);
     try {
-      return await updateSupermemoryMemory({ containerTag, id, content: text });
+      return await updateSupermemoryMemory({ namespace, id, content: text });
     } catch (error) {
       rethrowFriendly(error, "Couldn't update that memory. Try again.");
     }
@@ -170,9 +166,9 @@ export const editMemory = action({
 export const forgetMemory = action({
   args: { id: v.string() },
   handler: async (ctx, { id }): Promise<null> => {
-    const { containerTag } = await requireMemoryAccess(ctx);
+    const { namespace } = await requireMemoryAccess(ctx);
     try {
-      await forgetSupermemoryMemory({ containerTag, id });
+      await forgetSupermemoryMemory({ namespace, id });
     } catch (error) {
       rethrowFriendly(error, "Couldn't forget that memory. Try again.");
     }
@@ -192,12 +188,12 @@ export const listSources = action({
     totalPages: number;
     totalItems: number;
   }> => {
-    const { userId, containerTag } = await requireMemoryAccess(ctx);
+    const { userId, namespace } = await requireMemoryAccess(ctx);
 
     let result: MemorySourcePage;
     try {
       result = await listSupermemorySources({
-        containerTag,
+        namespace,
         page: page ?? 1,
       });
     } catch (error) {
@@ -239,9 +235,9 @@ export const listSources = action({
 export const deleteSource = action({
   args: { id: v.string() },
   handler: async (ctx, { id }): Promise<null> => {
-    await requireMemoryAccess(ctx);
+    const { namespace } = await requireMemoryAccess(ctx);
     try {
-      await deleteSupermemoryDocument(id);
+      await deleteSupermemoryDocument({ namespace, id });
     } catch (error) {
       rethrowFriendly(error, "Couldn't remove that chat. Try again.");
     }
@@ -253,9 +249,9 @@ export const deleteSource = action({
 export const forgetEverything = action({
   args: {},
   handler: async (ctx): Promise<{ documents: number; memories: number }> => {
-    const { containerTag } = await requireMemoryAccess(ctx);
+    const { namespace } = await requireMemoryAccess(ctx);
     try {
-      return await wipeSupermemoryContainer(containerTag);
+      return await wipeSupermemoryNamespace(namespace);
     } catch (error) {
       rethrowFriendly(error, "Couldn't clear your memory. Try again.");
     }

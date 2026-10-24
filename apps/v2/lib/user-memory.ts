@@ -59,10 +59,10 @@ export function useMemories(enabled: boolean) {
   }, [enabled, refresh]);
 
   const add = useCallback(
-    async (content: string, isStatic: boolean) => {
-      const created = await addMemory({ content, isStatic });
-      // Supermemory answers with the row it wrote; if it ever doesn't, fall
-      // back to a refetch rather than showing a list missing the new memory.
+    async (content: string) => {
+      const created = await addMemory({ content });
+      // A hand-written memory goes in as a document, so there's usually no
+      // row to splice in — refetch rather than show a list missing it.
       if (created) {
         setMemories((prev) => [created, ...(prev ?? [])]);
         setTotalItems((count) => count + 1);

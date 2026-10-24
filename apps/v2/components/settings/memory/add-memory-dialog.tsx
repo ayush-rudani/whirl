@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 
-import { ToggleSwitch } from "@/components/toggle-switch";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,9 +16,7 @@ import { errorText } from "@/lib/integrations-data";
 import { showToast } from "@/lib/toasts";
 import { MemoryTextarea } from "./memory-textarea";
 
-/* Write a memory by hand instead of waiting for Whirl to notice it.
-   "Always remember" marks the fact as a permanent trait, which pins it to
-   the top of the list and stops Supermemory ageing it out. */
+/* Write a memory by hand instead of waiting for Whirl to notice it. */
 export function AddMemoryDialog({
   open,
   onOpenChange,
@@ -27,10 +24,9 @@ export function AddMemoryDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onAdd: (content: string, isStatic: boolean) => Promise<void>;
+  onAdd: (content: string) => Promise<void>;
 }) {
   const [draft, setDraft] = useState("");
-  const [always, setAlways] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const trimmed = draft.trim();
@@ -40,10 +36,7 @@ export function AddMemoryDialog({
   const setOpen = (next: boolean) => {
     if (saving) return; // a dismiss shouldn't strand an in-flight save
     onOpenChange(next);
-    if (!next) {
-      setDraft("");
-      setAlways(false);
-    }
+    if (!next) setDraft("");
   };
 
   const close = () => setOpen(false);
@@ -52,9 +45,8 @@ export function AddMemoryDialog({
     if (!trimmed || saving) return;
     setSaving(true);
     try {
-      await onAdd(trimmed, always);
+      await onAdd(trimmed);
       setDraft("");
-      setAlways(false);
       onOpenChange(false);
     } catch (error) {
       showToast(errorText(error, "Couldn't save that memory. Try again."));
@@ -85,30 +77,17 @@ export function AddMemoryDialog({
           />
         </div>
 
-        <DialogFooter className="items-center justify-between">
-          {/* The switch is presentational here: the whole row is the target. */}
-          <button
-            type="button"
-            aria-pressed={always}
-            disabled={saving}
-            onClick={() => setAlways((value) => !value)}
-            className="flex items-center gap-2 text-[12.5px] text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
+        <DialogFooter className="items-center">
+          <Button variant="ghost" disabled={saving} onClick={close}>
+            Cancel
+          </Button>
+          <Button
+            disabled={!trimmed || saving}
+            className="min-w-[88px]"
+            onClick={() => void save()}
           >
-            <ToggleSwitch checked={always} />
-            Always remember this
-          </button>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" disabled={saving} onClick={close}>
-              Cancel
-            </Button>
-            <Button
-              disabled={!trimmed || saving}
-              className="min-w-[88px]"
-              onClick={() => void save()}
-            >
-              {saving ? <Spinner /> : "Remember"}
-            </Button>
-          </div>
+            {saving ? <Spinner /> : "Remember"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

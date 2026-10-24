@@ -16,7 +16,7 @@ import {
 import {
   fetchSupermemoryPromptContext,
   isSupermemoryConfigured,
-  supermemoryContainerTagForUser,
+  supermemoryNamespaceForUser,
   type SupermemoryPromptContext,
 } from "../supermemory";
 import {
@@ -134,7 +134,7 @@ async function suggestionContext({
   if (stored.memoryEnabled && isSupermemoryConfigured()) {
     try {
       memory = await fetchSupermemoryPromptContext({
-        containerTag: supermemoryContainerTagForUser(userId),
+        namespace: supermemoryNamespaceForUser(userId),
         query: sample(MEMORY_QUERIES, 1)[0]!,
       });
     } catch (error) {
