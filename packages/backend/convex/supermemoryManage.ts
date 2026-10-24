@@ -147,19 +147,6 @@ function toMemorySource(row: unknown): MemorySource | null {
   };
 }
 
-/** The single memory a write echoes back — sometimes the object itself, other
- *  times wrapped in a list. Null when the shape is unfamiliar; callers refetch
- *  rather than guess. */
-function firstEntryOf(response: unknown): MemoryEntry | null {
-  const direct = toMemoryEntry(response);
-  if (direct) return direct;
-  for (const row of rowsOf(response, "memories")) {
-    const entry = toMemoryEntry(row);
-    if (entry) return entry;
-  }
-  return null;
-}
-
 function asCount(value: unknown, fallback: number): number {
   return typeof value === "number" && Number.isFinite(value) && value >= 0
     ? Math.floor(value)
@@ -244,12 +231,13 @@ export async function addSupermemoryMemory({
   return null;
 }
 
-/** Rewrite a memory. Supermemory versions rather than overwrites — the old
- *  text is kept behind the new one, under a new id.
+/** Rewrite a memory. v5 has no memory-level edit, and a memory doesn't say
+ *  which document it came from — usually a whole chat transcript we wouldn't
+ *  want to overwrite with one fact. So the new text goes in as its own
+ *  memory and the old one is forgotten, which gives the edit a new id.
  *
- *  Still on the v4 route: v5 dropped memory-level edits in favour of
- *  replacing the source document, and most memories here come from whole
- *  chat transcripts we wouldn't want to overwrite with a single fact. */
+ *  Add first: if that fails nothing has changed, and if the forget fails the
+ *  worst case is a duplicate the user can see and remove, never a lost fact. */
 export async function updateSupermemoryMemory({
   namespace,
   id,
@@ -258,17 +246,21 @@ export async function updateSupermemoryMemory({
   namespace: string;
   id: string;
   content: string;
-}): Promise<MemoryEntry | null> {
-  const response = await supermemoryRequest<unknown>({
-    path: "/v4/memories",
-    method: "PATCH",
-    body: {
-      containerTag: namespace,
+}): Promise<null> {
+  await addSupermemoryMemory({ namespace, content });
+
+  try {
+    await forgetSupermemoryMemory({ namespace, id });
+  } catch (error) {
+    console.error("[supermemory] edit saved but old memory survived", {
       id,
-      newContent: content.slice(0, MAX_MEMORY_CONTENT),
-    },
-  });
-  return firstEntryOf(response);
+      error,
+    });
+    throw new ConvexError(
+      "Saved your edit, but the old version is still here. Forget it to tidy up.",
+    );
+  }
+  return null;
 }
 
 export async function forgetSupermemoryMemory({

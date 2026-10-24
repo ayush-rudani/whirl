@@ -137,7 +137,7 @@ export const listMemories = action({
  *  ingested document rather than the memory, so the client refetches. */
 export const addMemory = action({
   args: { content: v.string() },
-  handler: async (ctx, { content }): Promise<MemoryEntry | null> => {
+  handler: async (ctx, { content }): Promise<null> => {
     const { namespace } = await requireMemoryAccess(ctx);
     const text = requireContent(content);
     try {
@@ -148,10 +148,11 @@ export const addMemory = action({
   },
 });
 
-/** Rewrite an existing memory. The reply carries the new version's id. */
+/** Rewrite an existing memory. The edit lands under a new id, so the client
+ *  refetches rather than patching the row in place. */
 export const editMemory = action({
   args: { id: v.string(), content: v.string() },
-  handler: async (ctx, { id, content }): Promise<MemoryEntry | null> => {
+  handler: async (ctx, { id, content }): Promise<null> => {
     const { namespace } = await requireMemoryAccess(ctx);
     const text = requireContent(content);
     try {
