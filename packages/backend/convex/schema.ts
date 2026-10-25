@@ -837,8 +837,10 @@ export default defineSchema({
       v.object({
         // Toolkit slug in Composio's catalog, e.g. "github".
         slug: v.string(),
-        // The Composio-managed auth config created for this toolkit.
-        authConfigId: v.string(),
+        // The Composio-managed auth config created for this toolkit. Optional:
+        // no-auth toolkits (see `noAuth`) have rows saved without one, and
+        // nothing ever connects an account to them anyway.
+        authConfigId: v.optional(v.string()),
         // The single-toolkit MCP server created for this listing.
         mcpServerId: v.string(),
         // True for toolkits that need no account at all (e.g. Hacker News) —

@@ -617,10 +617,13 @@ export const removeToolkit = action({
       `/api/v3/mcp/servers/${encodeURIComponent(row.composio.mcpServerId)}`,
       { method: "DELETE" },
     ).catch(() => {});
-    await composioFetch(
-      `/api/v3/auth_configs/${encodeURIComponent(row.composio.authConfigId)}`,
-      { method: "DELETE" },
-    ).catch(() => {});
+    const { authConfigId } = row.composio;
+    if (authConfigId) {
+      await composioFetch(
+        `/api/v3/auth_configs/${encodeURIComponent(authConfigId)}`,
+        { method: "DELETE" },
+      ).catch(() => {});
+    }
     await ctx.runMutation(internal.composio.removeListing, { id: args.id });
     return null;
   },

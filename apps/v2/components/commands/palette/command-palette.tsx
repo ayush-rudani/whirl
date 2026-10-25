@@ -291,10 +291,13 @@ export function CommandPalette() {
   const emptyLabel = (() => {
     if (query) return `${NO_MATCH[incognito ? "actions" : type]} "${value.trim()}"`;
     if (scope) return "This folder is empty";
-    if (type === "artifacts")
+    if (type === "artifacts") {
+      if (results.artifactsFailed)
+        return "Couldn't load your artifacts right now. Try again in a moment.";
       return results.loadingArtifacts
         ? "Loading…"
         : "No artifacts yet — ask whirl for a doc or a page";
+    }
     if (results.loadingChats) return "Loading…";
     if (type === "folders") return "No folders yet — start one from a chat's ⋯ menu";
     return "No chats yet";

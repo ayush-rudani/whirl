@@ -1,13 +1,14 @@
 "use client";
 
 import { startTransition, useEffect, useMemo, useState } from "react";
-import { useConvexAuth, useQuery } from "convex/react";
+import { useConvexAuth, useQueries } from "convex/react";
+import type { FunctionReturnType } from "convex/server";
 import { api } from "@whirl/backend/convex/_generated/api";
 
 import { useFolders, type FolderSummary } from "@/lib/folders";
 import { useOpenedTitles } from "@/lib/locked/thread-lock";
 import { useThreads, type ThreadSummary } from "@/lib/threads";
-import type { PaletteSection, PaletteType } from "./palette";
+import type { ArtifactSummary, PaletteSection, PaletteType } from "./palette";
 import {
   actionSections,
   allSections,
@@ -35,6 +36,13 @@ export const CLOSE_RESET_DELAY_MS = 200;
 
 const EMPTY_FOLDERS: FolderSummary[] = [];
 
+type DeepHit = FunctionReturnType<typeof api.historySearch.deepSearch>[number];
+
+/* Stand-ins for a failed fetch — module constants, so the memos downstream
+   don't see a "new" empty list on every render. */
+const NO_DEEP_HITS: DeepHit[] = [];
+const NO_ARTIFACTS: ArtifactSummary[] = [];
+
 export type PaletteResults = {
   sections: PaletteSection[];
   itemCount: number;
@@ -44,6 +52,9 @@ export type PaletteResults = {
   loadingChats: boolean;
   /** The artifact list hasn't arrived yet. */
   loadingArtifacts: boolean;
+  /** The artifact list couldn't be fetched (an error, or a backend that
+   *  doesn't have the query yet). */
+  artifactsFailed: boolean;
   /** A full-text pass is owed or in flight for the current query. */
   showDeepNotice: boolean;
   folders: FolderSummary[];
@@ -133,19 +144,41 @@ export function usePaletteResults({
   }, [query, wantsDeep]);
   const liveDeepQuery = wantsDeep ? deepQuery : "";
 
-  const deepHits = useQuery(
-    api.historySearch.deepSearch,
-    isAuthenticated && liveDeepQuery ? { query: liveDeepQuery } : "skip",
+  /* useQueries, not useQuery: a failed query comes back as an Error instead
+     of being thrown into the tree. The palette lives in the shell, so a web
+     build that lands before its backend — or a search that errors — must
+     degrade to "nothing here", never take the whole app down. A key left
+     out of the request is the same as "skip". */
+  const fetchArtifacts = isAuthenticated && engaged && !incognito;
+  const requests = useMemo(
+    () => ({
+      ...(isAuthenticated && liveDeepQuery
+        ? {
+            deep: {
+              query: api.historySearch.deepSearch,
+              args: { query: liveDeepQuery },
+            },
+          }
+        : {}),
+      /* Fetched whenever the palette is up (not just on the Artifacts
+         tab), so switching tabs finds the list already there. */
+      ...(fetchArtifacts
+        ? { artifacts: { query: api.historySearch.recentArtifacts, args: {} } }
+        : {}),
+    }),
+    [isAuthenticated, liveDeepQuery, fetchArtifacts],
   );
+  const fetched = useQueries(requests);
+  /* A failed deep pass simply finds nothing more. */
+  const deepHits: DeepHit[] | undefined =
+    fetched.deep instanceof Error ? NO_DEEP_HITS : fetched.deep;
+  const artifactsFailed = fetched.artifacts instanceof Error;
+  const artifacts: ArtifactSummary[] | undefined = artifactsFailed
+    ? NO_ARTIFACTS
+    : fetched.artifacts;
+
   const deepSettled =
     wantsDeep && liveDeepQuery === query && deepHits !== undefined;
-
-  /* Fetched whenever the palette is up (not just on the Artifacts tab), so
-     switching tabs finds the list already there. */
-  const artifacts = useQuery(
-    api.historySearch.recentArtifacts,
-    isAuthenticated && engaged && !incognito ? {} : "skip",
-  );
 
   const sources = useMemo((): PaletteSources => {
     const list = threads ?? [];
@@ -241,7 +274,8 @@ export function usePaletteResults({
     itemCount,
     counts,
     loadingChats: threads === undefined && isAuthenticated,
-    loadingArtifacts: artifacts === undefined && isAuthenticated && !incognito,
+    loadingArtifacts: artifacts === undefined && fetchArtifacts,
+    artifactsFailed,
     showDeepNotice,
     folders,
   };
