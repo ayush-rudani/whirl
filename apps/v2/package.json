@@ -26,6 +26,7 @@
     "@streamdown/math": "^1.0.2",
     "@tabler/icons-react": "^3.44.0",
     "@tailwindcss/browser": "^4.3.3",
+    "@tanstack/react-hotkeys": "0.17.0",
     "@tiptap/extension-image": "3.27.3",
     "@tiptap/extension-table": "^3.27.3",
     "@tiptap/pm": "^3.27.3",

@@ -8,24 +8,34 @@ import {
   useMemo,
   useRef,
   useState,
-  type ReactNode,
 } from "react";
 import {
   IconLoader2,
   IconMessageCircleFilled,
   IconSearch,
 } from "@tabler/icons-react";
+import { useAppHotkeys } from "@tanstack/react-hotkeys";
 import { useConvexAuth, useQuery } from "convex/react";
 import { motion } from "motion/react";
 import { api } from "@whirl/backend/convex/_generated/api";
 
 import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Kbd } from "@/components/ui/kbd";
+import { matchCommands } from "@/lib/commands/match-commands";
+import {
+  flushOverlayAction,
+  setKeyboardOverlay,
+  useKeyboardOverlay,
+} from "@/lib/commands/overlays";
+import { useCommands, type Command } from "@/lib/commands/use-commands";
 import { useFolders } from "@/lib/folders";
+import { useIncognitoState } from "@/lib/incognito";
 import { pinRasterPath } from "@/lib/motion";
 import { useOpenedTitles } from "@/lib/locked/thread-lock";
 import { MASK_TEXT } from "@/lib/replay-guard";
 import { cn } from "@/lib/utils";
 import { groupThreads, useThreads, type ThreadSummary } from "@/lib/threads";
+import { CommandRow } from "./command-row";
 
 const MAX_RESULTS = 50;
 
@@ -135,22 +145,29 @@ function SearchingDeeper() {
   );
 }
 
-/* Command-palette style thread search. The body height morphs to fit the
-   results: a ResizeObserver measures the (max-h capped) scroller and the
-   motion wrapper animates toward it, so shrinking result sets pull the
-   modal up instead of snapping. */
-export function SearchModal({
-  open,
-  onOpenChange,
-  trigger,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  /* Rendered inside the Dialog root (wrap it in <DialogTrigger render={…}>)
-     so Base UI treats it as the palette's own trigger: pressing it while
-     open toggles closed instead of racing outside-press dismissal. */
-  trigger?: ReactNode;
-}) {
+/* The ⌘K palette: app commands up top, thread search below. One instance
+   for the whole shell, opened through lib/commands/overlays.ts by the
+   hotkey, the sidebar's Search row and the phone's History button alike.
+   The body height morphs to fit the results: a ResizeObserver measures the
+   (max-h capped) scroller and the motion wrapper animates toward it, so
+   shrinking result sets pull the modal up instead of snapping. */
+export function CommandPalette() {
+  const open = useKeyboardOverlay() === "palette";
+  const onOpenChange = useCallback(
+    (next: boolean) => {
+      if (next) setKeyboardOverlay("palette");
+      else if (open) setKeyboardOverlay(null);
+    },
+    [open],
+  );
+  /* Incognito keeps the commands but drops the history — that's exactly
+     what this mode isn't, and a hop to a saved thread would torch the
+     ephemeral chat. */
+  const { enabled: incognito } = useIncognitoState();
+  const showChats = !incognito;
+  const commands = useCommands();
+  const appHotkeys = useAppHotkeys();
+
   const { isAuthenticated } = useConvexAuth();
   const threads = useThreads(isAuthenticated);
   /* Real names for the locked chats this tab has open — used for matching
@@ -163,18 +180,6 @@ export function SearchModal({
   /* The debounced query the deep (full-text) pass actually searches for. */
   const [deepQuery, setDeepQuery] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
-
-  /* ⌘K / Ctrl+K from anywhere. */
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() === "k" && (event.metaKey || event.ctrlKey)) {
-        event.preventDefault();
-        onOpenChange(!open);
-      }
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onOpenChange]);
 
   /* Fresh slate per open; focus is Base UI's job via initialFocus. */
   useEffect(() => {
@@ -222,8 +227,13 @@ export function SearchModal({
     return () => clearTimeout(id);
   }, [open]);
 
+  const actions = useMemo(
+    () => matchCommands(commands, query),
+    [commands, query],
+  );
+
   const groups = useMemo((): Array<[string, ThreadSummary[]]> => {
-    if (!threads) return [];
+    if (!threads || !showChats) return [];
     /* No query: the full library, grouped like the sidebar, free to
        scroll (trimmed to the fold until the stream-in lands). Queries cap
        at MAX_RESULTS to keep filtering instant. */
@@ -244,7 +254,7 @@ export function SearchModal({
       )
       .slice(0, MAX_RESULTS);
     return groupThreads(matches);
-  }, [threads, query, fullLibrary, openedTitles]);
+  }, [threads, showChats, query, fullLibrary, openedTitles]);
 
   const titleFlat = useMemo(
     () => groups.flatMap(([, items]) => items),
@@ -272,9 +282,10 @@ export function SearchModal({
 
   const deepHits = useQuery(
     api.historySearch.deepSearch,
-    isAuthenticated && deepQuery ? { query: deepQuery } : "skip",
+    isAuthenticated && showChats && deepQuery ? { query: deepQuery } : "skip",
   );
-  const deepSettled = Boolean(query) && deepQuery === query && deepHits !== undefined;
+  const deepSettled =
+    Boolean(query) && deepQuery === query && deepHits !== undefined;
 
   /* Deep hits arrive as thread ids — resolve them against the loaded list
      (which already hides deleted/pending-delete threads) and drop anything
@@ -292,17 +303,19 @@ export function SearchModal({
     return matches;
   }, [deepSettled, threads, deepHits, titleFlat]);
 
-  /* Title matches first, deep matches after — one list for the keyboard. */
+  /* Commands first, then title matches, then deep matches — one list for
+     the keyboard, with thread rows numbered after the commands. */
   const flat = useMemo(
     () => [...titleFlat, ...deepMatches.map((match) => match.thread)],
     [titleFlat, deepMatches],
   );
+  const itemCount = actions.length + flat.length;
 
   /* A deep pass is owed for what's in the input — true through the
      debounce AND the in-flight query. The notice element lives across the
      whole stretch: remounting it restarts the CSS shimmer, which reads as
      the animation "resetting" every time the search kicks in. */
-  const deepOutstanding = Boolean(query) && !deepSettled;
+  const deepOutstanding = Boolean(query) && showChats && !deepSettled;
 
   /* When the notice appears: straight away when titles came up empty (it
      owns the empty-state slot), otherwise only once the pause elapses —
@@ -322,6 +335,16 @@ export function SearchModal({
     },
     [onOpenChange],
   );
+
+  /* Commands close the palette themselves and run once it has faded out
+     (runAfterOverlay), so a picker or confirm they open never loses focus
+     to the palette's exit. */
+  const runCommand = useCallback((command: Command) => command.run(), []);
+
+  const choose = (index: number) => {
+    if (index < actions.length) runCommand(actions[index]);
+    else select(flat[index - actions.length]);
+  };
 
   /* Height morph plumbing. The observer attaches through a callback ref —
      the popup portals in a beat after `open` flips, so an open-keyed
@@ -352,18 +375,25 @@ export function SearchModal({
       ?.scrollIntoView({ block: "nearest" });
   }, [bodyEl, activeIndex]);
 
-  let rowIndex = -1;
+  let rowIndex = actions.length - 1;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} modal="trap-focus">
-      {trigger}
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      onOpenChangeComplete={(next) => {
+        if (!next) flushOverlayAction();
+      }}
+      modal="trap-focus"
+    >
       {/* Same frost recipe as the menus, but with the app's standard scrim
           behind it — the frosted dim pulls focus off the page (link-gate
           recipe) while trap-focus above keeps scroll free. The translucent
           popover var is hand-mixed (bg-popover/55 dies in the build) over a
           light backdrop blur. */}
       <DialogContent
-        aria-label="Search threads"
+        aria-label="Search and commands"
+        data-keyboard-layer=""
         keepMounted
         backdropClassName="backdrop-blur-xs"
         initialFocus={inputRef}
@@ -378,21 +408,21 @@ export function SearchModal({
             onKeyDown={(event) => {
               if (event.key === "ArrowDown") {
                 event.preventDefault();
-                setActiveIndex((index) => Math.min(index + 1, flat.length - 1));
+                setActiveIndex((index) => Math.min(index + 1, itemCount - 1));
               } else if (event.key === "ArrowUp") {
                 event.preventDefault();
                 setActiveIndex((index) => Math.max(index - 1, 0));
               } else if (event.key === "Enter") {
                 event.preventDefault();
-                select(flat[activeIndex]);
+                choose(activeIndex);
               }
             }}
-            placeholder="Search threads…"
+            placeholder={
+              showChats ? "Search chats or run a command…" : "Run a command…"
+            }
             className="h-full min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
-          <kbd className="shrink-0 rounded-md px-1.5 py-0.5 text-xs text-muted-foreground ring-1 ring-border">
-            Esc
-          </kbd>
+          <Kbd>Esc</Kbd>
         </div>
 
         {/* The container spring is the only animation here — content swaps
@@ -408,13 +438,34 @@ export function SearchModal({
             ref={setBodyEl}
             className="max-h-80 overflow-y-auto p-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
-            {flat.length === 0 && !showDeepNotice ? (
+            {actions.length > 0 && (
+              <section>
+                <div className="flex h-7 items-end px-2.5 pb-1 text-xs font-medium text-muted-foreground">
+                  Actions
+                </div>
+                {actions.map((command, index) => (
+                  <CommandRow
+                    key={command.id}
+                    command={command}
+                    hotkey={appHotkeys[command.id].hotkey}
+                    index={index}
+                    active={index === activeIndex}
+                    onHover={setActiveIndex}
+                    onSelect={runCommand}
+                  />
+                ))}
+              </section>
+            )}
+
+            {itemCount === 0 && !showDeepNotice ? (
               <div className="flex h-16 items-center justify-center text-sm text-muted-foreground">
-                {!threads
-                  ? "Loading…"
-                  : query
-                    ? `No chats match "${value.trim()}"`
-                    : "No chats yet"}
+                {!showChats
+                  ? `No commands match "${value.trim()}"`
+                  : !threads
+                    ? "Loading…"
+                    : query
+                      ? `Nothing matches "${value.trim()}"`
+                      : "No chats yet"}
               </div>
             ) : (
               <>
@@ -482,7 +533,7 @@ export function SearchModal({
               <motion.div
                 {...POP_IN}
                 className={
-                  flat.length === 0
+                  itemCount === 0
                     ? "flex h-16 items-center justify-center gap-2.5"
                     : "flex h-9 items-center gap-2.5 px-2.5"
                 }

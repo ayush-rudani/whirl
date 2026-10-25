@@ -1,20 +1,18 @@
 "use client";
 
-import { useState } from "react";
 import { IconPencilPlus, IconSearch } from "@tabler/icons-react";
 import { useConvexAuth } from "convex/react";
 
-import { DialogTrigger } from "@/components/ui/dialog";
-import { SearchModal } from "@/components/search-modal";
 import { ThreadList } from "@/components/thread-list";
 import { UserButton } from "@/components/user-button";
+import { setKeyboardOverlay } from "@/lib/commands/overlays";
 import { useView } from "@/lib/view";
 
 /* The rail, as a page.
  *
  * Taking the drawer away on phones took the thread list, the palette and the
  * account row with it, so this puts all three back where a thumb can reach
- * them: the History tab. It is the same ThreadList, SearchModal and
+ * them: the History tab. It is the same ThreadList, palette and
  * UserButton the desktop rail builds itself out of — nothing here is a
  * second copy of anything, only a different arrangement of it.
  *
@@ -26,29 +24,19 @@ export function HistoryView() {
   const { openHome } = useView();
   const { isAuthenticated, isLoading } = useConvexAuth();
   const signedOut = !isLoading && !isAuthenticated;
-  const [searchOpen, setSearchOpen] = useState(false);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col px-3 pt-[max(1rem,env(safe-area-inset-top))]">
       <header className="mb-2 flex shrink-0 items-center gap-1 px-1.5">
         <h1 className="mr-auto text-xl font-semibold tracking-tight">Chats</h1>
-        <SearchModal
-          open={searchOpen}
-          onOpenChange={setSearchOpen}
-          trigger={
-            <DialogTrigger
-              render={
-                <button
-                  type="button"
-                  aria-label="Search chats"
-                  className="flex size-10 cursor-pointer items-center justify-center rounded-full text-foreground-soft transition-[background-color,scale] duration-150 active:scale-[0.94] active:bg-accent-pressed"
-                >
-                  <IconSearch size={20} stroke={2} />
-                </button>
-              }
-            />
-          }
-        />
+        <button
+          type="button"
+          aria-label="Search chats"
+          onClick={() => setKeyboardOverlay("palette")}
+          className="flex size-10 cursor-pointer items-center justify-center rounded-full text-foreground-soft transition-[background-color,scale] duration-150 active:scale-[0.94] active:bg-accent-pressed"
+        >
+          <IconSearch size={20} stroke={2} />
+        </button>
         <button
           type="button"
           aria-label="New chat"

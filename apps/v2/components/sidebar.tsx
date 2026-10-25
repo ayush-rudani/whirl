@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   IconLayoutSidebarLeftCollapseFilled,
   IconLayoutSidebarLeftExpandFilled,
@@ -9,6 +8,7 @@ import {
   IconSearch,
 } from "@tabler/icons-react";
 
+import { setKeyboardOverlay } from "@/lib/commands/overlays";
 import { useIncognitoState } from "@/lib/incognito";
 import { useExpiredIntegrations } from "@/lib/integrations-data";
 import {
@@ -17,10 +17,8 @@ import {
   useSidebar,
 } from "@/lib/sidebar";
 import { useView } from "@/lib/view";
-import { DialogTrigger } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { PageSlide } from "./page-slide";
-import { SearchModal } from "./search-modal";
 import { SettingsSidebar } from "./settings/settings-sidebar";
 import { SidebarRow } from "./sidebar-row";
 import { SyncIndicator } from "./sync-indicator";
@@ -39,31 +37,17 @@ import { WhirlLogo } from "./whirl-logo";
 const GLIDE =
   "transition-[translate,width,padding,opacity,visibility] duration-[240ms] ease-[cubic-bezier(0.32,0.72,0,1)]";
 
-/* Owns the palette's open state so toggling it re-renders this row alone —
-   not the whole sidebar, whose thread list is a heavy commit to drop right
-   as the entrance animation starts. The row is a real DialogTrigger, so
-   Base UI excludes it from outside-press dismissal and pressing it while
-   open toggles closed instead of racing a close-then-reopen. */
+/* Opens the shell's one palette (lib/commands/overlays.ts). The open state
+   lives in that store, so toggling it re-renders the palette alone — not
+   this sidebar, whose thread list is a heavy commit to drop right as the
+   entrance animation starts. */
 function SearchRow() {
-  const [open, setOpen] = useState(false);
-  /* ⌘K stays dead while incognito — history is exactly what this mode
-     isn't, and a palette hop would torch the ephemeral chat. */
-  const { enabled: incognito } = useIncognitoState();
   return (
-    <SearchModal
-      open={open && !incognito}
-      onOpenChange={(next) => setOpen(next && !incognito)}
-      trigger={
-        <DialogTrigger
-          render={
-            <SidebarRow
-              icon={IconSearch}
-              label="Search"
-              className="before:-top-px before:-bottom-px"
-            />
-          }
-        />
-      }
+    <SidebarRow
+      icon={IconSearch}
+      label="Search"
+      onClick={() => setKeyboardOverlay("palette")}
+      className="before:-top-px before:-bottom-px"
     />
   );
 }
