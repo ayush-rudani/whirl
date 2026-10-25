@@ -5,7 +5,8 @@ import type { Command } from "./use-commands";
    outranks a hit on a word it doesn't show. */
 const KEYWORD_WEIGHT = 0.8;
 
-function scoreCommand(command: Command, query: string): number {
+/** How well a command answers a query, 0 for not at all. */
+export function scoreCommand(command: Command, query: string): number {
   let best = scoreText(command.label, query);
   for (const keyword of command.keywords) {
     best = Math.max(best, scoreText(keyword, query) * KEYWORD_WEIGHT);

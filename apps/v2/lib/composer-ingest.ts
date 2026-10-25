@@ -13,6 +13,25 @@ export function registerQuoteInsert(fn: QuoteInsertFn | null) {
   insertFn = fn;
 }
 
+/* The palette's Compose hands its query over as a whole new draft —
+   replacing, not appending like a quote. Registered by the chat face
+   alongside the quote handler. */
+type ComposerFillFn = (text: string) => void;
+
+let fillFn: ComposerFillFn | null = null;
+
+export function registerComposerFill(fn: ComposerFillFn | null) {
+  fillFn = fn;
+}
+
+/** Replace the composer's draft and focus it. False when no composer is
+ *  mounted to take it. */
+export function fillComposer(text: string): boolean {
+  if (!fillFn) return false;
+  fillFn(text);
+  return true;
+}
+
 /** Insert an already-formatted message quote into the mounted composer. */
 export function insertComposerQuote(quote: string): boolean {
   return insertFn?.(quote) ?? false;

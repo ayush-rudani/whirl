@@ -32,9 +32,24 @@ const COMPOSER_ROWS: SheetRow[] = [
   { id: "composer.mention", name: "Mention an integration", hotkey: "@", idle: false },
 ];
 
+/* Keys that only mean something inside the ⌘K palette. */
+const PALETTE_ROWS: SheetRow[] = [
+  {
+    id: "palette.type",
+    name: "Change type",
+    /* Not a sequence — either arrow works. Listed as one only so the sheet
+       draws both keycaps on one row. */
+    hotkey: ["ArrowLeft", "ArrowRight"],
+    idle: false,
+  },
+  { id: "palette.actions", name: "Chat actions", hotkey: "Alt+Enter", idle: false },
+  { id: "palette.compose", name: "Compose from search", hotkey: "Tab", idle: false },
+  { id: "palette.back", name: "Leave a folder", hotkey: "Backspace", idle: false },
+];
+
 /* Everything the registry declares, grouped in declaration order, with the
-   composer's own keys tacked on the end. Read live from the hotkey
-   provider, so this sheet and the keyboard can't disagree. */
+   palette's and composer's own keys tacked on the end. Read live from the
+   hotkey provider, so this sheet and the keyboard can't disagree. */
 function useSheetGroups(): Array<[string, SheetRow[]]> {
   const list = useAppHotkeyList();
   return useMemo(() => {
@@ -51,6 +66,7 @@ function useSheetGroups(): Array<[string, SheetRow[]]> {
       });
       groups.set(group, rows);
     }
+    groups.set("In search", PALETTE_ROWS);
     groups.set("Composer", COMPOSER_ROWS);
     return [...groups];
   }, [list]);

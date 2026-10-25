@@ -3,62 +3,29 @@
 import { memo, useState } from "react";
 import { useConvex } from "convex/react";
 import {
-  IconCheck,
   IconCircleCheckFilled,
-  IconDots,
-  IconFolderFilled,
-  IconFolderMinus,
-  IconFolderPlus,
-  IconFolderSymlink,
   IconGitBranch,
-  IconKey,
   IconLoader2,
   IconLockFilled,
-  IconLockOpen,
-  IconPencil,
   IconPinFilled,
-  IconSparklesFilled,
-  IconTrash,
 } from "@tabler/icons-react";
 import { AnimatePresence, motion } from "motion/react";
 
-import {
-  requestLock,
-  requestLockRemoval,
-  requestPasswordChange,
-  requestUnlock,
-} from "@/lib/locked/lock-dialogs";
-import { forgetKey, useIsThreadOpen } from "@/lib/locked/keyring";
-import { useLockActions, useOpenedTitle } from "@/lib/locked/thread-lock";
+import { useIsThreadOpen } from "@/lib/locked/keyring";
+import { useOpenedTitle } from "@/lib/locked/thread-lock";
 import { pinRasterPath } from "@/lib/motion";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   beginThreadDrag,
   endThreadDrag,
   THREAD_DRAG_TYPE,
-  useFolderActions,
   type FolderSummary,
 } from "@/lib/folders";
-import { runMutation as run } from "@/lib/toasts";
-import { useThreadActions, type ThreadSummary } from "@/lib/threads";
+import type { ThreadSummary } from "@/lib/threads";
 import { cancelHoverWarm, warmThreadOnHover } from "@/lib/thread-warm";
 import { useView } from "@/lib/view";
-import { RenameDialog } from "./rename-dialog";
 import { RowPill } from "./row-pill";
+import { ThreadActionsMenu } from "./thread-actions-menu";
 import { ThreadTitle } from "./thread-title";
-
-/* Same rhythm as the user menu's items. */
-const ITEM = "gap-2 px-2 py-1.5";
-const ICON = "text-muted-foreground";
 
 /* One chat in the sidebar: title, a pin glyph when pinned, and a ⋯ menu
    that fades in on hover — always visible on touch, where hover doesn't
@@ -85,14 +52,9 @@ export const ThreadRow = memo(function ThreadRow({
   finished?: boolean;
   onNavigate?: () => void;
 }) {
-  const threadActions = useThreadActions();
-  const lockActions = useLockActions();
-  const folderActions = useFolderActions();
   const convex = useConvex();
-  const { threadId, openThread, openHome } = useView();
+  const { threadId, openThread } = useView();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [renameOpen, setRenameOpen] = useState(false);
-  const [newFolderOpen, setNewFolderOpen] = useState(false);
 
   const isPinned = thread.pinnedAt !== null;
   const isActive = threadId === thread.id;
@@ -222,190 +184,13 @@ export const ThreadRow = memo(function ThreadRow({
         ) : null}
       </AnimatePresence>
 
-      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-        <DropdownMenuTrigger
-          aria-label={`Actions for ${title}`}
-          className="absolute top-1/2 right-1 flex size-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-foreground-soft opacity-0 transition-opacity duration-150 group-hover/thread:opacity-100 focus-visible:opacity-100 data-popup-open:opacity-100 coarse:opacity-100"
-        >
-          <IconDots size={16} />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start" sideOffset={4} className="w-48 p-1">
-          <DropdownMenuItem
-            className={ITEM}
-            onClick={() => run(threadActions.setPinned(thread.id, !isPinned))}
-          >
-            <IconPinFilled size={15} className={ICON} />
-            {isPinned ? "Unpin" : "Pin"}
-          </DropdownMenuItem>
-
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger className={ITEM}>
-              <IconFolderSymlink size={15} className={ICON} />
-              Move to folder
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="w-52 p-1">
-              {folders.map((folder) => (
-                <DropdownMenuItem
-                  key={folder.id}
-                  className={ITEM}
-                  onClick={() =>
-                    run(
-                      threadActions.setFolder(
-                        thread.id,
-                        thread.folderId === folder.id ? null : folder.id,
-                      ),
-                    )
-                  }
-                >
-                  <IconFolderFilled size={15} className={ICON} />
-                  <span className="min-w-0 flex-1 truncate">{folder.name}</span>
-                  {thread.folderId === folder.id && (
-                    <IconCheck size={15} className="shrink-0" />
-                  )}
-                </DropdownMenuItem>
-              ))}
-              {thread.folderId && (
-                <DropdownMenuItem
-                  className={ITEM}
-                  onClick={() => run(threadActions.setFolder(thread.id, null))}
-                >
-                  <IconFolderMinus size={15} className={ICON} />
-                  Remove from folder
-                </DropdownMenuItem>
-              )}
-              {folders.length > 0 && <DropdownMenuSeparator />}
-              <DropdownMenuItem
-                className={ITEM}
-                onClick={() => setNewFolderOpen(true)}
-              >
-                <IconFolderPlus size={15} className={ICON} />
-                New folder…
-              </DropdownMenuItem>
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-
-          <DropdownMenuItem
-            className={ITEM}
-            /* A locked thread's name is sealed with everything else, so it
-               can only be changed by a tab holding the key. */
-            disabled={thread.locked && !isUnlocked}
-            onClick={() => setRenameOpen(true)}
-          >
-            <IconPencil size={15} className={ICON} />
-            Rename
-          </DropdownMenuItem>
-
-          {/* Same shimmer the thread got when it was first named, just asked
-              for on purpose — and off the whole conversation this time. No
-              such thing in a locked chat: the model can't read it. */}
-          {!thread.locked && (
-            <DropdownMenuItem
-              className={ITEM}
-              disabled={isGeneratingTitle}
-              onClick={() => run(threadActions.regenerateTitle(thread.id))}
-            >
-              <IconSparklesFilled size={15} className={ICON} />
-              Regenerate title
-            </DropdownMenuItem>
-          )}
-
-          <DropdownMenuSeparator />
-
-          {thread.locked ? (
-            <>
-              {isUnlocked ? (
-                <DropdownMenuItem
-                  className={ITEM}
-                  onClick={() => forgetKey(thread.id)}
-                >
-                  <IconLockFilled size={15} className={ICON} />
-                  Lock now
-                </DropdownMenuItem>
-              ) : (
-                <DropdownMenuItem
-                  className={ITEM}
-                  onClick={() => requestUnlock(thread.id)}
-                >
-                  <IconLockOpen size={15} className={ICON} />
-                  Unlock
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuItem
-                className={ITEM}
-                disabled={!isUnlocked}
-                onClick={() => requestPasswordChange(thread.id)}
-              >
-                <IconKey size={15} className={ICON} />
-                Change password
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className={ITEM}
-                disabled={!isUnlocked}
-                onClick={() => requestLockRemoval(thread.id)}
-              >
-                <IconLockOpen size={15} className={ICON} />
-                Remove lock
-              </DropdownMenuItem>
-            </>
-          ) : (
-            <DropdownMenuItem
-              className={ITEM}
-              onClick={() => requestLock(thread.id)}
-            >
-              <IconLockFilled size={15} className={ICON} />
-              Lock chat
-            </DropdownMenuItem>
-          )}
-
-          <DropdownMenuSeparator />
-
-          <DropdownMenuItem
-            className={ITEM}
-            variant="destructive"
-            onClick={() => {
-              /* Don't leave the view staring at a thread that's ticking
-                 toward deletion. */
-              if (isActive) openHome();
-              /* Nothing left for the key to open. */
-              if (thread.locked) forgetKey(thread.id);
-              threadActions.requestDelete(thread);
-            }}
-          >
-            <IconTrash size={15} />
-            Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <RenameDialog
-        open={renameOpen}
-        onOpenChange={setRenameOpen}
-        title="Rename thread"
-        placeholder="Thread title"
-        initialValue={title}
-        /* A locked thread's name is sealed like its messages, so it takes
-           the lock path — the plain rename would write it in the clear. */
-        onSubmit={(next) =>
-          run(
-            thread.locked
-              ? lockActions.rename(thread.id, next)
-              : threadActions.rename(thread.id, next),
-          )
-        }
-      />
-      <RenameDialog
-        open={newFolderOpen}
-        onOpenChange={setNewFolderOpen}
-        title="New folder"
-        placeholder="Folder name"
-        submitLabel="Create"
-        onSubmit={(name) =>
-          run(
-            folderActions
-              .create(name)
-              .then((folderId) => threadActions.setFolder(thread.id, folderId)),
-          )
-        }
+      <ThreadActionsMenu
+        thread={thread}
+        folders={folders}
+        title={title}
+        open={menuOpen}
+        onOpenChange={setMenuOpen}
+        triggerClassName="absolute top-1/2 right-1 flex size-6 -translate-y-1/2 cursor-pointer items-center justify-center rounded-md text-foreground-soft opacity-0 transition-opacity duration-150 group-hover/thread:opacity-100 focus-visible:opacity-100 data-popup-open:opacity-100 coarse:opacity-100"
       />
     </div>
   );

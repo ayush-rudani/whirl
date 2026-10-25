@@ -5,7 +5,7 @@ import { HotkeysProvider } from "@tanstack/react-hotkeys";
 
 import { appHotkeys } from "@/lib/commands/hotkeys";
 import { CommandHotkeys } from "./command-hotkeys";
-import { CommandPalette } from "./command-palette";
+import { CommandPalette } from "./palette/command-palette";
 import { ShortcutSheet } from "./shortcut-sheet";
 
 /* Keyboard-first plumbing for the shell: the hotkey provider (which knows
