@@ -1,4 +1,10 @@
-import { supermemoryRequest } from "./supermemory";
+import { ConvexError } from "convex/values";
+
+import {
+  addSupermemoryDocument,
+  supermemoryNamespacePath,
+  supermemoryRequest,
+} from "./supermemory";
 
 /**
  * The user-facing half of Supermemory: everything the Memory settings tab needs
@@ -75,25 +81,18 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-/** Pull the list out of a response, whichever key it arrived under.
- *  `memoryEntries` is what /v4/memories/list actually answers with;
- *  `memories` is what the /v3 documents list confusingly calls its rows. */
-function rowsOf(response: unknown): unknown[] {
+/** v5 lists answer `{ documents, chunks, memories, pagination }` and fill only
+ *  the array that was asked for — the others can arrive empty, so read the
+ *  requested key by name rather than taking the first array in sight. */
+function rowsOf(response: unknown, key: "documents" | "memories"): unknown[] {
   if (Array.isArray(response)) return response;
-  const record = asRecord(response);
-  if (!record) return [];
-  for (const key of [
-    "memoryEntries",
-    "memories",
-    "results",
-    "documents",
-    "data",
-    "items",
-  ]) {
-    const rows = record[key];
-    if (Array.isArray(rows)) return rows;
-  }
-  return [];
+  const rows = asRecord(response)?.[key];
+  return Array.isArray(rows) ? rows : [];
+}
+
+/** v5 tucks lifecycle fields (status, timestamps) under `system`. */
+function systemField(record: Record<string, unknown>, key: string): unknown {
+  return record[key] ?? asRecord(record.system)?.[key];
 }
 
 function toMemoryEntry(row: unknown): MemoryEntry | null {
@@ -109,13 +108,13 @@ function toMemoryEntry(row: unknown): MemoryEntry | null {
   if (record.isForgotten === true || record.isLatest === false) return null;
   if (asString(record.status) === "forgotten") return null;
 
-  const createdAt = asTimestamp(record.createdAt);
+  const createdAt = asTimestamp(systemField(record, "createdAt"));
   return {
     id,
     memory,
     isStatic: record.isStatic === true,
     createdAt,
-    updatedAt: asTimestamp(record.updatedAt) ?? createdAt,
+    updatedAt: asTimestamp(systemField(record, "updatedAt")) ?? createdAt,
   };
 }
 
@@ -140,23 +139,12 @@ function toMemorySource(row: unknown): MemorySource | null {
     id,
     title: title ?? SOURCE_TITLE_FALLBACK,
     summary: asString(record.summary),
-    status: asString(record.status) ?? "unknown",
+    status: asString(systemField(record, "status")) ?? "unknown",
     threadId: metadata ? asString(metadata.threadId) : null,
-    updatedAt: asTimestamp(record.updatedAt) ?? asTimestamp(record.createdAt),
+    updatedAt:
+      asTimestamp(systemField(record, "updatedAt")) ??
+      asTimestamp(systemField(record, "createdAt")),
   };
-}
-
-/** The single memory a write echoes back — sometimes the object itself, other
- *  times wrapped in a list. Null when the shape is unfamiliar; callers refetch
- *  rather than guess. */
-function firstEntryOf(response: unknown): MemoryEntry | null {
-  const direct = toMemoryEntry(response);
-  if (direct) return direct;
-  for (const row of rowsOf(response)) {
-    const entry = toMemoryEntry(row);
-    if (entry) return entry;
-  }
-  return null;
 }
 
 function asCount(value: unknown, fallback: number): number {
@@ -165,12 +153,20 @@ function asCount(value: unknown, fallback: number): number {
     : fallback;
 }
 
+/** v5 bulk deletes answer 200 even when some ids didn't go: `errors` lists
+ *  the ones that failed. One id in, so any error means it's still there. */
+function failedDeleteDetail(response: unknown): string | null {
+  const errors = asRecord(response)?.errors;
+  if (!Array.isArray(errors) || errors.length === 0) return null;
+  return JSON.stringify(errors).slice(0, 240);
+}
+
 /* --- Memories -------------------------------------------------------------- */
 
 /** Every live memory Supermemory holds for this user, newest first, with the
  *  upstream total so a capped list can say so. */
 export async function listSupermemoryMemories(
-  containerTag: string,
+  namespace: string,
 ): Promise<{ memories: MemoryEntry[]; totalItems: number }> {
   const entries: MemoryEntry[] = [];
   let totalItems = 0;
@@ -178,16 +174,18 @@ export async function listSupermemoryMemories(
 
   for (let page = 1; page <= Math.min(totalPages, MAX_MEMORY_PAGES); page += 1) {
     const response = await supermemoryRequest<unknown>({
-      path: "/v4/memories/list",
+      path: supermemoryNamespacePath(namespace, "/list/memories"),
       method: "POST",
-      body: {
-        containerTags: [containerTag],
-        limit: MEMORIES_PAGE_SIZE,
+      query: {
         page,
+        limit: MEMORIES_PAGE_SIZE,
+        sort: "updatedAt",
+        order: "desc",
       },
+      body: {},
     });
 
-    for (const row of rowsOf(response)) {
+    for (const row of rowsOf(response, "memories")) {
       const entry = toMemoryEntry(row);
       if (entry) entries.push(entry);
     }
@@ -213,71 +211,75 @@ export async function listSupermemoryMemories(
   };
 }
 
-/** Write a memory the user typed themselves, returning the stored row. */
+/** Write a memory the user typed themselves. v5 has no direct memory write,
+ *  so it goes in as a tiny document extracted on the spot. The reply is the
+ *  document's acceptance, not a memory row, so callers refetch the list. */
 export async function addSupermemoryMemory({
-  containerTag,
+  namespace,
   content,
-  isStatic,
 }: {
-  containerTag: string;
+  namespace: string;
   content: string;
-  isStatic: boolean;
-}): Promise<MemoryEntry | null> {
-  const response = await supermemoryRequest<unknown>({
-    path: "/v4/memories",
-    method: "POST",
-    body: {
-      containerTag,
-      memories: [
-        {
-          content: content.slice(0, MAX_MEMORY_CONTENT),
-          isStatic,
-          metadata: { source: "whirl", origin: "user_edit" },
-        },
-      ],
-    },
+}): Promise<null> {
+  await addSupermemoryDocument({
+    namespace,
+    id: `whirl-memory-${crypto.randomUUID()}`,
+    content: content.slice(0, MAX_MEMORY_CONTENT),
+    metadata: { source: "whirl", origin: "user_edit" },
+    dreaming: "instant",
   });
-  const created = firstEntryOf(response);
-  // The write echoes the row back but not always its flag; we know what we
-  // asked for, so don't let the list mislabel a permanent trait.
-  return created ? { ...created, isStatic } : null;
+  return null;
 }
 
-/** Rewrite a memory. Supermemory versions rather than overwrites — the old
- *  text is kept behind the new one, under a new id. */
+/** Rewrite a memory. v5 has no memory-level edit, and a memory doesn't say
+ *  which document it came from — usually a whole chat transcript we wouldn't
+ *  want to overwrite with one fact. So the new text goes in as its own
+ *  memory and the old one is forgotten, which gives the edit a new id.
+ *
+ *  Add first: if that fails nothing has changed, and if the forget fails the
+ *  worst case is a duplicate the user can see and remove, never a lost fact. */
 export async function updateSupermemoryMemory({
-  containerTag,
+  namespace,
   id,
   content,
 }: {
-  containerTag: string;
+  namespace: string;
   id: string;
   content: string;
-}): Promise<MemoryEntry | null> {
-  const response = await supermemoryRequest<unknown>({
-    path: "/v4/memories",
-    method: "PATCH",
-    body: {
-      containerTag,
+}): Promise<null> {
+  await addSupermemoryMemory({ namespace, content });
+
+  try {
+    await forgetSupermemoryMemory({ namespace, id });
+  } catch (error) {
+    console.error("[supermemory] edit saved but old memory survived", {
       id,
-      newContent: content.slice(0, MAX_MEMORY_CONTENT),
-    },
-  });
-  return firstEntryOf(response);
+      error,
+    });
+    throw new ConvexError(
+      "Saved your edit, but the old version is still here. Forget it to tidy up.",
+    );
+  }
+  return null;
 }
 
 export async function forgetSupermemoryMemory({
-  containerTag,
+  namespace,
   id,
 }: {
-  containerTag: string;
+  namespace: string;
   id: string;
 }) {
-  await supermemoryRequest({
-    path: "/v4/memories",
+  const response = await supermemoryRequest<unknown>({
+    path: supermemoryNamespacePath(namespace, "/memories"),
     method: "DELETE",
-    body: { containerTag, id, reason: "Removed by the user in settings" },
+    body: { ids: [id] },
   });
+
+  const detail = failedDeleteDetail(response);
+  if (detail) {
+    throw new Error(`Supermemory couldn't forget memory ${id}: ${detail}`);
+  }
 }
 
 /* --- Source documents ------------------------------------------------------ */
@@ -285,27 +287,27 @@ export async function forgetSupermemoryMemory({
 /** One page of the documents Whirl has pushed for this user — the raw material
  *  memories are extracted from. */
 export async function listSupermemorySources({
-  containerTag,
+  namespace,
   page,
 }: {
-  containerTag: string;
+  namespace: string;
   page: number;
 }): Promise<MemorySourcePage> {
   const safePage = Math.max(1, Math.floor(page));
   const response = await supermemoryRequest<unknown>({
-    path: "/v3/documents/list",
+    path: supermemoryNamespacePath(namespace, "/list/documents"),
     method: "POST",
-    body: {
-      containerTags: [containerTag],
-      limit: SOURCES_PAGE_SIZE,
+    query: {
       page: safePage,
+      limit: SOURCES_PAGE_SIZE,
       sort: "updatedAt",
       order: "desc",
     },
+    body: {},
   });
 
   const sources: MemorySource[] = [];
-  for (const row of rowsOf(response)) {
+  for (const row of rowsOf(response, "documents")) {
     const source = toMemorySource(row);
     if (source) sources.push(source);
   }
@@ -319,19 +321,38 @@ export async function listSupermemorySources({
   };
 }
 
-export async function deleteSupermemoryDocument(id: string) {
-  await supermemoryRequest({
-    path: `/v3/documents/${encodeURIComponent(id)}`,
+/** Scoped to the namespace, so an id from someone else's list can't reach
+ *  their documents. v5 refuses to delete anything mid-ingestion. */
+export async function deleteSupermemoryDocument({
+  namespace,
+  id,
+}: {
+  namespace: string;
+  id: string;
+}) {
+  const response = await supermemoryRequest<unknown>({
+    path: supermemoryNamespacePath(namespace, "/document"),
     method: "DELETE",
+    body: { ids: [id] },
   });
+
+  const detail = failedDeleteDetail(response);
+  if (!detail) return;
+  if (detail.toLowerCase().includes("still processing")) {
+    throw new ConvexError(
+      "That chat is still being added to memory. Try again in a minute.",
+    );
+  }
+  throw new Error(`Supermemory couldn't delete document ${id}: ${detail}`);
 }
 
-/** Drop the user's whole container: every document and every memory. */
-export async function wipeSupermemoryContainer(
-  containerTag: string,
+/** Drop the user's whole namespace: every document and every memory. No
+ *  `moveTo`, so this is the permanent delete it's meant to be. */
+export async function wipeSupermemoryNamespace(
+  namespace: string,
 ): Promise<{ documents: number; memories: number }> {
   const response = await supermemoryRequest<unknown>({
-    path: `/v3/container-tags/${encodeURIComponent(containerTag)}`,
+    path: supermemoryNamespacePath(namespace),
     method: "DELETE",
   });
 

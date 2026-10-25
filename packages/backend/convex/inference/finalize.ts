@@ -137,7 +137,7 @@ export const finalizeAssistantTurnArgs = {
   unmetered: v.optional(v.boolean()),
   incognito: v.boolean(),
   memoryActive: v.boolean(),
-  memoryContainerTag: v.string(),
+  memoryNamespace: v.string(),
   usageFactor: v.number(),
   scaleFreeMessages: v.boolean(),
   thinking: v.boolean(),
@@ -297,8 +297,8 @@ export async function finalizeAssistantTurn(
     const saved = await bestEffort(
       "Supermemory conversation write",
       addSupermemoryDocument({
-        containerTag: args.memoryContainerTag,
-        customId: `whirl-message-${args.assistantId}`,
+        namespace: args.memoryNamespace,
+        id: `whirl-message-${args.assistantId}`,
         content: buildSupermemoryConversationDocument({
           user: args.latestUserText,
           assistant: args.text,

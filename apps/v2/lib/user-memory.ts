@@ -59,16 +59,11 @@ export function useMemories(enabled: boolean) {
   }, [enabled, refresh]);
 
   const add = useCallback(
-    async (content: string, isStatic: boolean) => {
-      const created = await addMemory({ content, isStatic });
-      // Supermemory answers with the row it wrote; if it ever doesn't, fall
-      // back to a refetch rather than showing a list missing the new memory.
-      if (created) {
-        setMemories((prev) => [created, ...(prev ?? [])]);
-        setTotalItems((count) => count + 1);
-      } else {
-        await refresh();
-      }
+    async (content: string) => {
+      // A hand-written memory goes in as a document, so there's no row to
+      // splice in — refetch rather than show a list missing it.
+      await addMemory({ content });
+      await refresh();
     },
     [addMemory, refresh],
   );
@@ -80,24 +75,16 @@ export function useMemories(enabled: boolean) {
         prev?.map((row) => (row.id === id ? { ...row, memory: content } : row)),
       );
       try {
-        // An edit is a new version with a new id, so adopt what came back —
-        // keeping our own `isStatic`, which the version payload omits.
-        const updated = await editMemory({ id, content });
-        if (updated) {
-          setMemories((prev) =>
-            prev?.map((row) =>
-              row.id === id
-                ? { ...row, ...updated, isStatic: row.isStatic }
-                : row,
-            ),
-          );
-        }
+        await editMemory({ id, content });
       } catch (caught) {
         setMemories(previous);
         throw caught;
       }
+      // The edit is a fresh memory under a new id and the old one is gone,
+      // so the row we patched points at nothing — reload the real list.
+      await refresh();
     },
-    [editMemory, memories],
+    [editMemory, memories, refresh],
   );
 
   const forget = useCallback(

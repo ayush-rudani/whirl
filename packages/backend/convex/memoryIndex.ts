@@ -17,7 +17,7 @@ import { captureServerEvent } from "./posthog";
 import {
   addSupermemoryDocument,
   isSupermemoryConfigured,
-  supermemoryContainerTagForUser,
+  supermemoryNamespaceForUser,
 } from "./supermemory";
 
 // One index per rolling 24h, per user, on paid plans.
@@ -332,7 +332,7 @@ export const processRun = internalAction({
         return;
       }
 
-      const containerTag = supermemoryContainerTagForUser(userId);
+      const namespace = supermemoryNamespaceForUser(userId);
       let totalSynced = 0;
 
       for (const threadId of threadIds) {
@@ -344,8 +344,8 @@ export const processRun = internalAction({
           );
           if (transcript.length > 0) {
             await addSupermemoryDocument({
-              containerTag,
-              customId: `whirl-thread-${threadId}`,
+              namespace,
+              id: `whirl-thread-${threadId}`,
               content: `Whirl chat transcript\n\n${buildTranscript(transcript)}`,
               metadata: {
                 type: "thread_transcript",
