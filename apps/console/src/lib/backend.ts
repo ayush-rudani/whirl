@@ -105,8 +105,7 @@ export type ComposioToolkit = {
   logoUrl: string | null;
   categories: string[];
   toolCount: number | null;
-  noAuth: boolean;
-  managedAuth: boolean;
+  authKind: "none" | "managed" | "unmanaged" | "unknown";
   added: boolean;
 };
 
