@@ -2,6 +2,7 @@ import { v } from "convex/values";
 
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalQuery, query } from "./_generated/server";
+import { hasArtifactBody } from "./artifactContent";
 
 // How many raw search hits we consider before thread filtering, and how many
 // survive into the tool result. The search index scores by BM25, so the best
@@ -188,5 +189,94 @@ export const deepSearch = query({
     }
 
     return results;
+  },
+});
+
+// How many of each artifact kind the palette's Artifacts list loads — newest
+// first, and filtered on the client as the user types.
+const RECENT_ARTIFACTS_PER_KIND = 40;
+
+/**
+ * The command palette's Artifacts list: the user's most recently created
+ * documents, full HTML pages and inline visualizations (the charts and
+ * diagrams drawn into a chat), newest first — the same things a thread's
+ * Files menu lists, across every thread. Only finished, non-empty ones — a
+ * half-written document isn't something to jump back to — and never from
+ * incognito or locked threads, for the same reasons as the deep search above.
+ * Signed-out callers get an empty list, as with deepSearch.
+ */
+export const recentArtifacts = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) return [];
+    const userId = identity.subject;
+
+    /* One indexed read per HTML kind, so unfinished and failed rows never
+       eat into either kind's share. */
+    const finishedHtml = (kind: "full" | "inline") =>
+      ctx.db
+        .query("htmlArtifacts")
+        .withIndex("by_user_kind_status", (q) =>
+          q.eq("userId", userId).eq("kind", kind).eq("status", "complete"),
+        )
+        .order("desc")
+        .take(RECENT_ARTIFACTS_PER_KIND);
+
+    const [documents, pages, charts] = await Promise.all([
+      ctx.db
+        .query("documents")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .order("desc")
+        .take(RECENT_ARTIFACTS_PER_KIND),
+      finishedHtml("full"),
+      finishedHtml("inline"),
+    ]);
+
+    const threadCache = new Map<Id<"threads">, Doc<"threads"> | null>();
+    const visible = async (threadId: Id<"threads">) => {
+      let thread = threadCache.get(threadId);
+      if (thread === undefined) {
+        thread = await ctx.db.get(threadId);
+        threadCache.set(threadId, thread);
+      }
+      return thread !== null && !thread.incognito && !thread.lock;
+    };
+
+    const results: Array<{
+      id: string;
+      kind: "document" | "code" | "page" | "chart";
+      threadId: Id<"threads">;
+      title: string;
+      updatedAt: number;
+    }> = [];
+
+    for (const doc of documents) {
+      if (doc.status === "streaming" || !hasArtifactBody(doc)) continue;
+      if (!(await visible(doc.threadId))) continue;
+      results.push({
+        id: doc._id,
+        kind: doc.format === "code" ? "code" : "document",
+        threadId: doc.threadId,
+        title: doc.title?.trim() || doc.fileName || "Untitled document",
+        updatedAt: doc.updatedAt,
+      });
+    }
+
+    /* Titles fall back the way the thread's Files menu does, and inline
+       visuals are "charts" there too — the palette shouldn't rename them. */
+    for (const visual of [...pages, ...charts]) {
+      if (!hasArtifactBody(visual)) continue;
+      if (!(await visible(visual.threadId))) continue;
+      results.push({
+        id: visual._id,
+        kind: visual.kind === "full" ? "page" : "chart",
+        threadId: visual.threadId,
+        title: visual.title?.trim() || "Visualization",
+        updatedAt: visual.updatedAt,
+      });
+    }
+
+    return results.sort((a, b) => b.updatedAt - a.updatedAt);
   },
 });

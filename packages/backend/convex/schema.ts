@@ -302,6 +302,9 @@ export default defineSchema({
   })
     .index("by_thread", ["threadId"])
     .index("by_user", ["userId"])
+    // The palette's Artifacts list: a user's finished pages and inline
+    // charts (one range per kind), without wading through unfinished rows.
+    .index("by_user_kind_status", ["userId", "kind", "status"])
     .index("by_short_id", ["shortId"])
     // Finds rows the body backfill hasn't migrated yet (contentId undefined).
     .index("by_content_id", ["contentId"]),
@@ -837,8 +840,10 @@ export default defineSchema({
       v.object({
         // Toolkit slug in Composio's catalog, e.g. "github".
         slug: v.string(),
-        // The Composio-managed auth config created for this toolkit.
-        authConfigId: v.string(),
+        // The Composio-managed auth config created for this toolkit. Optional:
+        // no-auth toolkits (see `noAuth`) have rows saved without one, and
+        // nothing ever connects an account to them anyway.
+        authConfigId: v.optional(v.string()),
         // The single-toolkit MCP server created for this listing.
         mcpServerId: v.string(),
         // True for toolkits that need no account at all (e.g. Hacker News) —

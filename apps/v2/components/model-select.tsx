@@ -32,6 +32,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { onModelPickerRequest } from "@/lib/commands/model-picker";
 import { clampThinking } from "@/lib/composer-gates";
 import { useModelAccess } from "@/lib/model-access";
 import type { LockedModelPolicy } from "@whirl/backend/convex/lockedPolicy";
@@ -382,21 +383,38 @@ export function ModelSelect({
      one of also setting the gates or stars; dismissal is a click-away. */
   const selectModel = (key: string) => onValueChange(key);
 
+  /* Every open starts fresh on the compact view, whether it came from a
+     click or from the palette / hotkey below. */
+  const changeOpen = (next: boolean) => {
+    setOpen(next);
+    if (next) {
+      setView("small");
+      setQuery("");
+      setLegacyOpen(false);
+      setProviderFilter(null);
+      setCapabilityFilters(new Set());
+      setHeight("auto");
+    }
+  };
+  const changeOpenRef = useRef(changeOpen);
+  useLayoutEffect(() => {
+    changeOpenRef.current = changeOpen;
+  });
+
+  /* The palette and the hotkey ring for "switch model"; only a picker
+     that's actually on screen answers — a composer slid away behind
+     settings stays quiet. The chip is the twin's parent. */
+  useEffect(
+    () =>
+      onModelPickerRequest(() => {
+        const chip = twinRef.current?.parentElement;
+        if (chip?.checkVisibility()) changeOpenRef.current(true);
+      }),
+    [],
+  );
+
   return (
-    <Popover
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (next) {
-          setView("small");
-          setQuery("");
-          setLegacyOpen(false);
-          setProviderFilter(null);
-          setCapabilityFilters(new Set());
-          setHeight("auto");
-        }
-      }}
-    >
+    <Popover open={open} onOpenChange={changeOpen}>
       <PopoverTrigger
         aria-label="Choose model"
         className="relative flex h-9 shrink-0 cursor-pointer items-center rounded-full px-3 text-[13.5px]/4 font-medium text-muted-foreground transition-colors duration-150 hover:bg-black/[0.05] hover:text-foreground data-popup-open:bg-black/[0.05] data-popup-open:text-foreground dark:hover:bg-white/[0.06] dark:data-popup-open:bg-white/[0.06]"
