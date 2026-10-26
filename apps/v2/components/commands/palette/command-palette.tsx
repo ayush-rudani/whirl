@@ -188,7 +188,9 @@ export function CommandPalette() {
         runAfterOverlay(() =>
           openArtifactInThread(
             artifact.threadId,
-            artifact.kind === "page"
+            /* Pages and charts are both HTML artifacts; the panel renders
+               either. */
+            artifact.kind === "page" || artifact.kind === "chart"
               ? { kind: "html", htmlId: artifact.id }
               : { kind: "document", documentId: artifact.id },
             { currentThreadId: view.threadId, navigate: view.openThread },
@@ -228,7 +230,7 @@ export function CommandPalette() {
     switch (event.key) {
       case "ArrowDown":
         event.preventDefault();
-        highlight(Math.min(index + 1, itemCount - 1));
+        highlight(Math.min(index + 1, Math.max(itemCount - 1, 0)));
         return;
       case "ArrowUp":
         event.preventDefault();
@@ -281,11 +283,14 @@ export function CommandPalette() {
     return () => observer.disconnect();
   }, [bodyEl]);
 
-  /* Keep the keyboard highlight on screen as it walks past the fold. */
+  /* Keep the keyboard highlight on screen as it walks past the fold. A row
+     the pointer is resting on is already on screen — nudging a half-clipped
+     one "into view" would shift the list under the cursor and fight a wheel
+     scroll that's still gliding. */
   useEffect(() => {
-    bodyEl
-      ?.querySelector(`[data-index="${index}"]`)
-      ?.scrollIntoView({ block: "nearest" });
+    const row = bodyEl?.querySelector(`[data-index="${index}"]`);
+    if (!row || row.matches(":hover")) return;
+    row.scrollIntoView({ block: "nearest" });
   }, [bodyEl, index]);
 
   const emptyLabel = (() => {

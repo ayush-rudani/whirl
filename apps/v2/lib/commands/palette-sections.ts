@@ -207,20 +207,38 @@ export function chatSections(
 ): PaletteSection[] {
   const inScope = (thread: ThreadSummary) =>
     folderId === null || thread.folderId === folderId;
-  const threads = matches
-    ? matches.chats
-        .map(({ value }) => value)
-        .filter(inScope)
-        .slice(0, MAX_CHAT_RESULTS)
-    : library.filter(inScope);
+  const groups = matches
+    ? bucketMatches(
+        matches.chats
+          .map(({ value }) => value)
+          .filter(inScope)
+          .slice(0, MAX_CHAT_RESULTS),
+      )
+    : groupThreads(library.filter(inScope));
   return indexSections([
-    ...groupThreads(threads).map(([label, items]) => ({
+    ...groups.map(([label, items]) => ({
       key: `group:${label}`,
       label,
       items: items.map((thread) => threadItem(sources, thread)),
     })),
     deepSection(sources, deep),
   ]);
+}
+
+/* groupThreads only merges neighbours, which suits the date-sorted library.
+   Ranked matches hop between dates (Today, Yesterday, Today again), so each
+   label's runs are gathered into one bucket: buckets in order of their best
+   hit, hits in rank order within. */
+function bucketMatches(
+  threads: ThreadSummary[],
+): Array<[string, ThreadSummary[]]> {
+  const buckets = new Map<string, ThreadSummary[]>();
+  for (const [label, run] of groupThreads(threads)) {
+    const bucket = buckets.get(label);
+    if (bucket) bucket.push(...run);
+    else buckets.set(label, run);
+  }
+  return [...buckets];
 }
 
 export function folderSections(

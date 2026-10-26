@@ -3,6 +3,7 @@
 import { memo, type ReactNode } from "react";
 import {
   IconAppWindowFilled,
+  IconChartBubbleFilled,
   IconCornerDownLeft,
   IconFileCodeFilled,
   IconFileTextFilled,
@@ -168,6 +169,7 @@ const ARTIFACT_ICONS: Record<ArtifactSummary["kind"], TablerIcon> = {
   document: IconFileTextFilled,
   code: IconFileCodeFilled,
   page: IconAppWindowFilled,
+  chart: IconChartBubbleFilled,
 };
 
 export const ArtifactResultRow = memo(function ArtifactResultRow({

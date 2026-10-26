@@ -87,196 +87,196 @@ export function ThreadActionsMenu({
 
   return (
     <>
-    <DropdownMenu open={open} onOpenChange={onOpenChange}>
-      <DropdownMenuTrigger
-        aria-label={`Actions for ${title}`}
-        className={triggerClassName}
-      >
-        <IconDots size={16} />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align={align}
-        sideOffset={4}
-        finalFocus={finalFocus}
-        className="w-48 p-1"
-      >
-        <DropdownMenuItem
-          className={ITEM}
-          onClick={() => run(threadActions.setPinned(thread.id, !isPinned))}
+      <DropdownMenu open={open} onOpenChange={onOpenChange}>
+        <DropdownMenuTrigger
+          aria-label={`Actions for ${title}`}
+          className={triggerClassName}
         >
-          <IconPinFilled size={15} className={ICON} />
-          {isPinned ? "Unpin" : "Pin"}
-        </DropdownMenuItem>
-
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger className={ITEM}>
-            <IconFolderSymlink size={15} className={ICON} />
-            Move to folder
-          </DropdownMenuSubTrigger>
-          <DropdownMenuSubContent className="w-52 p-1">
-            {folders.map((folder) => (
-              <DropdownMenuItem
-                key={folder.id}
-                className={ITEM}
-                onClick={() =>
-                  run(
-                    threadActions.setFolder(
-                      thread.id,
-                      thread.folderId === folder.id ? null : folder.id,
-                    ),
-                  )
-                }
-              >
-                <IconFolderFilled size={15} className={ICON} />
-                <span className="min-w-0 flex-1 truncate">{folder.name}</span>
-                {thread.folderId === folder.id && (
-                  <IconCheck size={15} className="shrink-0" />
-                )}
-              </DropdownMenuItem>
-            ))}
-            {thread.folderId && (
-              <DropdownMenuItem
-                className={ITEM}
-                onClick={() => run(threadActions.setFolder(thread.id, null))}
-              >
-                <IconFolderMinus size={15} className={ICON} />
-                Remove from folder
-              </DropdownMenuItem>
-            )}
-            {folders.length > 0 && <DropdownMenuSeparator />}
-            <DropdownMenuItem
-              className={ITEM}
-              onClick={() => setNewFolderOpen(true)}
-            >
-              <IconFolderPlus size={15} className={ICON} />
-              New folder…
-            </DropdownMenuItem>
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
-
-        <DropdownMenuItem
-          className={ITEM}
-          /* A locked thread's name is sealed with everything else, so it
-             can only be changed by a tab holding the key. */
-          disabled={thread.locked && !isUnlocked}
-          onClick={() => setRenameOpen(true)}
+          <IconDots size={16} />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align={align}
+          sideOffset={4}
+          finalFocus={finalFocus}
+          className="w-48 p-1"
         >
-          <IconPencil size={15} className={ICON} />
-          Rename
-        </DropdownMenuItem>
-
-        {/* Same shimmer the thread got when it was first named, just asked
-            for on purpose — and off the whole conversation this time. No
-            such thing in a locked chat: the model can't read it. */}
-        {!thread.locked && (
           <DropdownMenuItem
             className={ITEM}
-            disabled={isGeneratingTitle}
-            onClick={() => run(threadActions.regenerateTitle(thread.id))}
+            onClick={() => run(threadActions.setPinned(thread.id, !isPinned))}
           >
-            <IconSparklesFilled size={15} className={ICON} />
-            Regenerate title
+            <IconPinFilled size={15} className={ICON} />
+            {isPinned ? "Unpin" : "Pin"}
           </DropdownMenuItem>
-        )}
 
-        <DropdownMenuSeparator />
-
-        {thread.locked ? (
-          <>
-            {isUnlocked ? (
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger className={ITEM}>
+              <IconFolderSymlink size={15} className={ICON} />
+              Move to folder
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="w-52 p-1">
+              {folders.map((folder) => (
+                <DropdownMenuItem
+                  key={folder.id}
+                  className={ITEM}
+                  onClick={() =>
+                    run(
+                      threadActions.setFolder(
+                        thread.id,
+                        thread.folderId === folder.id ? null : folder.id,
+                      ),
+                    )
+                  }
+                >
+                  <IconFolderFilled size={15} className={ICON} />
+                  <span className="min-w-0 flex-1 truncate">{folder.name}</span>
+                  {thread.folderId === folder.id && (
+                    <IconCheck size={15} className="shrink-0" />
+                  )}
+                </DropdownMenuItem>
+              ))}
+              {thread.folderId && (
+                <DropdownMenuItem
+                  className={ITEM}
+                  onClick={() => run(threadActions.setFolder(thread.id, null))}
+                >
+                  <IconFolderMinus size={15} className={ICON} />
+                  Remove from folder
+                </DropdownMenuItem>
+              )}
+              {folders.length > 0 && <DropdownMenuSeparator />}
               <DropdownMenuItem
                 className={ITEM}
-                onClick={() => forgetKey(thread.id)}
+                onClick={() => setNewFolderOpen(true)}
               >
-                <IconLockFilled size={15} className={ICON} />
-                Lock now
+                <IconFolderPlus size={15} className={ICON} />
+                New folder…
               </DropdownMenuItem>
-            ) : (
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+
+          <DropdownMenuItem
+            className={ITEM}
+            /* A locked thread's name is sealed with everything else, so it
+               can only be changed by a tab holding the key. */
+            disabled={thread.locked && !isUnlocked}
+            onClick={() => setRenameOpen(true)}
+          >
+            <IconPencil size={15} className={ICON} />
+            Rename
+          </DropdownMenuItem>
+
+          {/* Same shimmer the thread got when it was first named, just asked
+              for on purpose — and off the whole conversation this time. No
+              such thing in a locked chat: the model can't read it. */}
+          {!thread.locked && (
+            <DropdownMenuItem
+              className={ITEM}
+              disabled={isGeneratingTitle}
+              onClick={() => run(threadActions.regenerateTitle(thread.id))}
+            >
+              <IconSparklesFilled size={15} className={ICON} />
+              Regenerate title
+            </DropdownMenuItem>
+          )}
+
+          <DropdownMenuSeparator />
+
+          {thread.locked ? (
+            <>
+              {isUnlocked ? (
+                <DropdownMenuItem
+                  className={ITEM}
+                  onClick={() => forgetKey(thread.id)}
+                >
+                  <IconLockFilled size={15} className={ICON} />
+                  Lock now
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  className={ITEM}
+                  onClick={() => requestUnlock(thread.id)}
+                >
+                  <IconLockOpen size={15} className={ICON} />
+                  Unlock
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 className={ITEM}
-                onClick={() => requestUnlock(thread.id)}
+                disabled={!isUnlocked}
+                onClick={() => requestPasswordChange(thread.id)}
+              >
+                <IconKey size={15} className={ICON} />
+                Change password
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className={ITEM}
+                disabled={!isUnlocked}
+                onClick={() => requestLockRemoval(thread.id)}
               >
                 <IconLockOpen size={15} className={ICON} />
-                Unlock
+                Remove lock
               </DropdownMenuItem>
-            )}
+            </>
+          ) : (
             <DropdownMenuItem
               className={ITEM}
-              disabled={!isUnlocked}
-              onClick={() => requestPasswordChange(thread.id)}
+              onClick={() => requestLock(thread.id)}
             >
-              <IconKey size={15} className={ICON} />
-              Change password
+              <IconLockFilled size={15} className={ICON} />
+              Lock chat
             </DropdownMenuItem>
-            <DropdownMenuItem
-              className={ITEM}
-              disabled={!isUnlocked}
-              onClick={() => requestLockRemoval(thread.id)}
-            >
-              <IconLockOpen size={15} className={ICON} />
-              Remove lock
-            </DropdownMenuItem>
-          </>
-        ) : (
+          )}
+
+          <DropdownMenuSeparator />
+
           <DropdownMenuItem
             className={ITEM}
-            onClick={() => requestLock(thread.id)}
+            variant="destructive"
+            onClick={() => {
+              /* Don't leave the view staring at a thread that's ticking
+                 toward deletion. */
+              if (isActive) openHome();
+              /* Nothing left for the key to open. */
+              if (thread.locked) forgetKey(thread.id);
+              threadActions.requestDelete(thread);
+            }}
           >
-            <IconLockFilled size={15} className={ICON} />
-            Lock chat
+            <IconTrash size={15} />
+            Delete
           </DropdownMenuItem>
-        )}
+        </DropdownMenuContent>
+      </DropdownMenu>
 
-        <DropdownMenuSeparator />
-
-        <DropdownMenuItem
-          className={ITEM}
-          variant="destructive"
-          onClick={() => {
-            /* Don't leave the view staring at a thread that's ticking
-               toward deletion. */
-            if (isActive) openHome();
-            /* Nothing left for the key to open. */
-            if (thread.locked) forgetKey(thread.id);
-            threadActions.requestDelete(thread);
-          }}
-        >
-          <IconTrash size={15} />
-          Delete
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-
-    <RenameDialog
-      open={renameOpen}
-      onOpenChange={setRenameOpen}
-      title="Rename thread"
-      placeholder="Thread title"
-      initialValue={title}
-      /* A locked thread's name is sealed like its messages, so it takes
-         the lock path — the plain rename would write it in the clear. */
-      onSubmit={(next) =>
-        run(
-          thread.locked
-            ? lockActions.rename(thread.id, next)
-            : threadActions.rename(thread.id, next),
-        )
-      }
-    />
-    <RenameDialog
-      open={newFolderOpen}
-      onOpenChange={setNewFolderOpen}
-      title="New folder"
-      placeholder="Folder name"
-      submitLabel="Create"
-      onSubmit={(name) =>
-        run(
-          folderActions
-            .create(name)
-            .then((folderId) => threadActions.setFolder(thread.id, folderId)),
-        )
-      }
-    />
+      <RenameDialog
+        open={renameOpen}
+        onOpenChange={setRenameOpen}
+        title="Rename thread"
+        placeholder="Thread title"
+        initialValue={title}
+        /* A locked thread's name is sealed like its messages, so it takes
+           the lock path — the plain rename would write it in the clear. */
+        onSubmit={(next) =>
+          run(
+            thread.locked
+              ? lockActions.rename(thread.id, next)
+              : threadActions.rename(thread.id, next),
+          )
+        }
+      />
+      <RenameDialog
+        open={newFolderOpen}
+        onOpenChange={setNewFolderOpen}
+        title="New folder"
+        placeholder="Folder name"
+        submitLabel="Create"
+        onSubmit={(name) =>
+          run(
+            folderActions
+              .create(name)
+              .then((folderId) => threadActions.setFolder(thread.id, folderId)),
+          )
+        }
+      />
     </>
   );
 }
