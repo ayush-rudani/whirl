@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 
 /* Sidebar geometry lives in localStorage (same keys as the main app) and is
    painted before hydration by an inline script in the root layout, which sets
    `--sidebar-width` and `data-sidebar-collapsed` on <html> — the same
-   pre-paint trick theme.ts uses for `.dark`. React state here drives behavior
+   pre-paint trick theme.ts uses for `.dark`. The store below drives behavior
    (aria labels, resize math); the var and attribute are the visual source of
    truth, so a stored width never flashes the default on load.
    Keep the numbers in sync with the script in app/layout.tsx. */
@@ -67,54 +67,61 @@ function applyDom(collapsed: boolean, width: number) {
   el.toggleAttribute("data-sidebar-collapsed", collapsed);
 }
 
-/* A doorbell for collapsing the rail from outside it — ⌘B and the palette.
-   The collapse state lives in useSidebar's component state (it has to stay
-   in step with the pre-paint script and the drag), so outsiders ring here
-   and the mounted rail answers. Listeners remove themselves on unmount. */
-const toggleListeners = new Set<() => void>();
+/* The rail's geometry as a tiny module-level store (mirrors lib/incognito.ts),
+   so ⌘B and the palette can fold the rail without reaching into it.
+   Read from storage once, on first client use. The server and hydration
+   render the defaults, then useSyncExternalStore swaps in what the
+   pre-paint script already painted — the same hand-off the old mount
+   effect made, without a setState in an effect. */
+type Geometry = { collapsed: boolean; width: number };
 
-export function requestSidebarToggle() {
-  for (const listener of toggleListeners) listener();
+const SERVER_GEOMETRY: Geometry = {
+  collapsed: false,
+  width: SIDEBAR_DEFAULT_WIDTH,
+};
+
+let geometry: Geometry | null = null;
+const listeners = new Set<() => void>();
+
+function getGeometry(): Geometry {
+  geometry ??= { collapsed: readCollapsed(), width: readWidth() };
+  return geometry;
 }
 
-/** Answers requestSidebarToggle with `handler`, always the latest one. */
-export function useSidebarToggleRequests(handler: () => void) {
-  const handlerRef = useRef(handler);
-  useLayoutEffect(() => {
-    handlerRef.current = handler;
-  });
-  useEffect(() => {
-    const listener = () => handlerRef.current();
-    toggleListeners.add(listener);
-    return () => {
-      toggleListeners.delete(listener);
-    };
-  }, []);
+function setGeometry(next: Partial<Geometry>) {
+  geometry = { ...getGeometry(), ...next };
+  for (const listener of listeners) listener();
+}
+
+function subscribe(listener: () => void) {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
+
+/** Folds or unfolds the rail — its button, ⌘B and the palette all land here. */
+export function toggleSidebarCollapsed() {
+  const { collapsed, width } = getGeometry();
+  const next = !collapsed;
+  setGeometry({ collapsed: next });
+  applyDom(next, width);
+  persist(COLLAPSED_KEY, next ? "1" : "0");
 }
 
 export function useSidebar() {
-  const [collapsed, setCollapsed] = useState(false);
-  const [width, setWidth] = useState(SIDEBAR_DEFAULT_WIDTH);
+  const { collapsed, width } = useSyncExternalStore(
+    subscribe,
+    getGeometry,
+    () => SERVER_GEOMETRY,
+  );
   const [resizing, setResizing] = useState(false);
-
-  /* Adopt what the pre-paint script already painted. */
-  useEffect(() => {
-    setCollapsed(readCollapsed());
-    setWidth(readWidth());
-  }, []);
 
   /* The drag's window listeners normally leave with the pointer, but a
      drag the browser abandons (or an unmount mid-drag) must not strand
      them on window for the rest of the session. */
   const endDragRef = useRef<(() => void) | null>(null);
   useEffect(() => () => endDragRef.current?.(), []);
-
-  const toggleCollapsed = () => {
-    const next = !collapsed;
-    setCollapsed(next);
-    applyDom(next, width);
-    persist(COLLAPSED_KEY, next ? "1" : "0");
-  };
 
   const onResizePointerDown = (event: ReactPointerEvent<HTMLElement>) => {
     if (collapsed || event.button !== 0) return;
@@ -145,7 +152,7 @@ export function useSidebar() {
       window.removeEventListener("pointercancel", finish);
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
-      setWidth(latest);
+      setGeometry({ width: latest });
       setResizing(false);
       persist(WIDTH_KEY, String(latest));
     };
@@ -157,7 +164,7 @@ export function useSidebar() {
   };
 
   const onResizeDoubleClick = () => {
-    setWidth(SIDEBAR_DEFAULT_WIDTH);
+    setGeometry({ width: SIDEBAR_DEFAULT_WIDTH });
     applyDom(false, SIDEBAR_DEFAULT_WIDTH);
     persist(WIDTH_KEY, String(SIDEBAR_DEFAULT_WIDTH));
   };
@@ -166,7 +173,7 @@ export function useSidebar() {
     collapsed,
     width,
     resizing,
-    toggleCollapsed,
+    toggleCollapsed: toggleSidebarCollapsed,
     onResizePointerDown,
     onResizeDoubleClick,
   };

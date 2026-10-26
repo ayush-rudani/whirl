@@ -19,7 +19,7 @@ import {
   useIncognitoState,
 } from "@/lib/incognito";
 import { useDesktopLayout } from "@/lib/desktop-layout";
-import { requestSidebarToggle } from "@/lib/sidebar";
+import { toggleSidebarCollapsed } from "@/lib/sidebar";
 import { useView } from "@/lib/view";
 import type { CommandId } from "./hotkeys";
 import { requestModelPicker } from "./model-picker";
@@ -116,7 +116,7 @@ export function useCommands(): Command[] {
            entirely. */
         available: desktop && !incognito.enabled,
         inPalette: true,
-        run: () => runAfterOverlay(requestSidebarToggle),
+        run: () => runAfterOverlay(toggleSidebarCollapsed),
       },
       {
         id: "settings.open",
