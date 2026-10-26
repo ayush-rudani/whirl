@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import {
   IconLayoutSidebarLeftCollapseFilled,
   IconLayoutSidebarLeftExpandFilled,
@@ -15,6 +16,7 @@ import {
   SIDEBAR_MAX_WIDTH,
   SIDEBAR_MIN_WIDTH,
   useSidebar,
+  useSidebarToggleRequests,
 } from "@/lib/sidebar";
 import { useView } from "@/lib/view";
 import { Separator } from "@/components/ui/separator";
@@ -75,6 +77,16 @@ export function Sidebar() {
   const { enabled: incognito } = useIncognitoState();
   const expiredIntegrations = useExpiredIntegrations();
 
+  /* ⌘B and the palette fold the rail from outside. Only a rail that's on
+     screen answers — below md it's display:none, and incognito tucks it
+     away (the command is off there anyway). */
+  const asideRef = useRef<HTMLElement>(null);
+  useSidebarToggleRequests(() => {
+    if (asideRef.current?.checkVisibility({ visibilityProperty: true })) {
+      toggleCollapsed();
+    }
+  });
+
   return (
     /* An even 8px beat between blocks; New and the nav rows tighten onto
        one shared row pitch (the -mt on the nav below). `relative` is the
@@ -82,6 +94,7 @@ export function Sidebar() {
        the drawer, which positioned the handle for free; as a plain flex
        item it would otherwise resolve against the viewport. */
     <aside
+      ref={asideRef}
       id="app-sidebar"
       className={`group/sidebar relative hidden shrink-0 flex-col gap-2 pt-3 pb-2 md:flex ${
         /* Incognito tucks the rail away: width glides to a slim gutter (so

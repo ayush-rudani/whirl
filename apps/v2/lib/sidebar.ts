@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
 
 /* Sidebar geometry lives in localStorage (same keys as the main app) and is
@@ -65,6 +65,31 @@ function applyDom(collapsed: boolean, width: number) {
     `${collapsed ? SIDEBAR_COLLAPSED_WIDTH : width}px`,
   );
   el.toggleAttribute("data-sidebar-collapsed", collapsed);
+}
+
+/* A doorbell for collapsing the rail from outside it — ⌘B and the palette.
+   The collapse state lives in useSidebar's component state (it has to stay
+   in step with the pre-paint script and the drag), so outsiders ring here
+   and the mounted rail answers. Listeners remove themselves on unmount. */
+const toggleListeners = new Set<() => void>();
+
+export function requestSidebarToggle() {
+  for (const listener of toggleListeners) listener();
+}
+
+/** Answers requestSidebarToggle with `handler`, always the latest one. */
+export function useSidebarToggleRequests(handler: () => void) {
+  const handlerRef = useRef(handler);
+  useLayoutEffect(() => {
+    handlerRef.current = handler;
+  });
+  useEffect(() => {
+    const listener = () => handlerRef.current();
+    toggleListeners.add(listener);
+    return () => {
+      toggleListeners.delete(listener);
+    };
+  }, []);
 }
 
 export function useSidebar() {

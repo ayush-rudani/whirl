@@ -19,13 +19,21 @@ export function CommandHotkeys() {
   useHotkeys(
     commands.map((command) => ({
       hotkey: appHotkeys[command.id],
-      callback: () => {
+      callback: (event) => {
+        /* Something closer to the focus already handled this key — ⌘B
+           in the document editor is bold, not the sidebar. */
+        if (event.defaultPrevented) return;
+        event.preventDefault();
         /* A confirm, menu or picker owns the keyboard while it's up. */
         if (isForeignOverlayOpen()) return;
         command.run();
       },
       options: { enabled: command.available },
     })),
+    /* Prevented by hand above, so an inner handler's claim on the key can
+       be seen first — the manager would otherwise prevent it before the
+       callback ever runs. */
+    { preventDefault: false },
   );
 
   return null;

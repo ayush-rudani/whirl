@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import {
   IconGhost2Filled,
   IconKeyboardFilled,
+  IconLayoutSidebarLeftCollapseFilled,
   IconPuzzleFilled,
   IconSearch,
   IconSettingsFilled,
@@ -17,6 +18,8 @@ import {
   useIncognitoActions,
   useIncognitoState,
 } from "@/lib/incognito";
+import { useDesktopLayout } from "@/lib/desktop-layout";
+import { requestSidebarToggle } from "@/lib/sidebar";
 import { useView } from "@/lib/view";
 import type { CommandId } from "./hotkeys";
 import { requestModelPicker } from "./model-picker";
@@ -53,6 +56,7 @@ export function useCommands(): Command[] {
   } = useView();
   const incognito = useIncognitoState();
   const { enter: enterIncognito } = useIncognitoActions();
+  const desktop = useDesktopLayout();
 
   /* The chat face is what's showing — the composer (and its model picker)
      are on screen, not slid away behind settings or the store. */
@@ -104,6 +108,17 @@ export function useCommands(): Command[] {
           runAfterOverlay(incognito.enabled ? requestIncognitoExit : enterIncognito),
       },
       {
+        id: "sidebar.toggle",
+        label: "Toggle sidebar",
+        icon: IconLayoutSidebarLeftCollapseFilled,
+        keywords: ["sidebar", "collapse", "expand", "hide", "show", "rail"],
+        /* Phones have a tab bar, not a rail; incognito tucks the rail away
+           entirely. */
+        available: desktop && !incognito.enabled,
+        inPalette: true,
+        run: () => runAfterOverlay(requestSidebarToggle),
+      },
+      {
         id: "settings.open",
         label: "Open settings",
         icon: IconSettingsFilled,
@@ -137,6 +152,7 @@ export function useCommands(): Command[] {
       threadId,
       settingsOpen,
       integrationsOpen,
+      desktop,
       openHome,
       openSettings,
       openIntegrations,

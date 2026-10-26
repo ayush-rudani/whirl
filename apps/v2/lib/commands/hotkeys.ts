@@ -31,6 +31,12 @@ export const appHotkeys = defineAppHotkeys({
     hotkey: "Mod+Shift+X",
     meta: { name: "Toggle incognito", group: "Chat" },
   },
+  /* ⌘B is bold in the document editor; that wins there (the hotkey layer
+     skips keys something closer to the focus already handled). */
+  "sidebar.toggle": {
+    hotkey: "Mod+B",
+    meta: { name: "Toggle sidebar", group: "Navigation" },
+  },
   "settings.open": {
     hotkey: "Mod+,",
     meta: { name: "Open settings", group: "Navigation" },
