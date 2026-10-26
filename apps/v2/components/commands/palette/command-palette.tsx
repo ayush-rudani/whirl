@@ -376,7 +376,10 @@ export function CommandPalette() {
               /* Five chips overflow a phone; a gliding fill fights the
                  scroll there (see StoreTabs). */
               glide={!coarse}
-              className="overflow-x-auto px-3 pb-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+              /* A horizontal scroller clips vertically too, which shaved the
+                 chips' outside ring off their top edge. -mt-1/pt-1 gives
+                 the ring room inside without moving the row. */
+              className="-mt-1 overflow-x-auto px-3 pt-1 pb-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             />
           )}
         </div>
