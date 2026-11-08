@@ -9,8 +9,18 @@ import { useSyncExternalStore } from "react";
 
 const QUERY = "(min-width: 768px)";
 
+/* One MediaQueryList for the tab's lifetime: getSnapshot runs on every
+   render of every subscriber, and a fresh matchMedia() each time is a
+   needless allocation and style lookup. */
+let media: MediaQueryList | null = null;
+
+function getMedia(): MediaQueryList {
+  media ??= window.matchMedia(QUERY);
+  return media;
+}
+
 function subscribe(onChange: () => void) {
-  const query = window.matchMedia(QUERY);
+  const query = getMedia();
   query.addEventListener("change", onChange);
   return () => query.removeEventListener("change", onChange);
 }
@@ -19,7 +29,7 @@ function subscribe(onChange: () => void) {
 export function useDesktopLayout(): boolean {
   return useSyncExternalStore(
     subscribe,
-    () => window.matchMedia(QUERY).matches,
+    () => getMedia().matches,
     () => false,
   );
 }

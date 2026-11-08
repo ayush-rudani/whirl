@@ -408,7 +408,14 @@ export function ModelSelect({
     () =>
       onModelPickerRequest(() => {
         const chip = twinRef.current?.parentElement;
-        if (chip?.checkVisibility()) changeOpenRef.current(true);
+        if (!chip) return;
+        /* checkVisibility is Safari 17.4+; older engines fall back to
+           "has a box at all", which still skips a display:none composer. */
+        const visible =
+          typeof chip.checkVisibility === "function"
+            ? chip.checkVisibility()
+            : chip.getClientRects().length > 0;
+        if (visible) changeOpenRef.current(true);
       }),
     [],
   );

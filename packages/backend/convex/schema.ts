@@ -301,9 +301,9 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_thread", ["threadId"])
-    .index("by_user", ["userId"])
     // The palette's Artifacts list: a user's finished pages and inline
     // charts (one range per kind), without wading through unfinished rows.
+    // Also covers any by-user lookup, so there's no separate by_user index.
     .index("by_user_kind_status", ["userId", "kind", "status"])
     .index("by_short_id", ["shortId"])
     // Finds rows the body backfill hasn't migrated yet (contentId undefined).

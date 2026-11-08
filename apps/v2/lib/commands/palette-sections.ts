@@ -286,7 +286,9 @@ export function artifactSections(
   const groups = new Map<string, PaletteSources["artifacts"]>();
   for (const entry of sources.artifacts) {
     const label = formatThreadGroup(entry.artifact.updatedAt);
-    groups.set(label, [...(groups.get(label) ?? []), entry]);
+    const group = groups.get(label);
+    if (group) group.push(entry);
+    else groups.set(label, [entry]);
   }
   return indexSections(
     [...groups].map(([label, entries]) => ({

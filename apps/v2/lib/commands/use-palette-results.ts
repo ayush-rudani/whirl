@@ -249,8 +249,6 @@ export function usePaletteResults({
     [sources, query],
   );
 
-  /* Deep hits arrive as thread ids — resolve them against the loaded list
-     and drop anything the title matches already cover. */
   /* Deep hits arrive as thread ids — resolve them against the (filtered)
      list and drop anything the title matches already cover. */
   const deep = useMemo(() => {
