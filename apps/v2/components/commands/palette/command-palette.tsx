@@ -418,7 +418,7 @@ export function CommandPalette() {
         aria-label="Search and commands"
         data-keyboard-layer=""
         keepMounted
-        backdropClassName="backdrop-blur-xs"
+        backdropClassName="backdrop-blur-md"
         initialFocus={inputRef}
         className="top-[16vh] max-w-xl bg-(--popover-translucent) p-0 backdrop-blur-xs duration-100"
       >
