@@ -38,52 +38,79 @@ function Hint({
 }
 
 /* The palette's cheat strip: what the keyboard can do from here. Touch
-   devices skip it — there's no keyboard to hint at. */
+   devices skip it — there's no keyboard to hint at.
+
+   Two shapes. Over results: close, change type (or drop the last filter,
+   when there's one to drop), open filters, the row's actions, compose.
+   While a filter is being picked: close, step back, pick. */
 export function PaletteFooter({
-  scoped,
+  picking,
+  canDropFilter,
   canChangeType,
+  canFilter,
   hasActions,
   onClose,
   onBack,
+  onFilters,
+  onSelect,
   onActions,
   onCompose,
 }: {
-  /** Drilled into a folder: Back replaces Change type. */
-  scoped: boolean;
+  /** The filter picker is showing instead of results. */
+  picking: boolean;
+  /** Filters are on and the field is empty, so Backspace drops the last. */
+  canDropFilter: boolean;
   canChangeType: boolean;
+  canFilter: boolean;
   /** The highlighted row has a menu to open. */
   hasActions: boolean;
   onClose: () => void;
+  /** Steps out of the picker, or drops the last filter. */
   onBack: () => void;
+  onFilters: () => void;
+  onSelect: () => void;
   onActions: () => void;
   onCompose: () => void;
 }) {
   return (
     <div className="flex h-11 items-center gap-1 border-t border-border px-2.5 coarse:hidden">
       <Hint label="Close" keys={<Kbd>Esc</Kbd>} onPress={onClose} />
-      {scoped ? (
-        <Hint label="Back" keys={<Kbd>⌫</Kbd>} onPress={onBack} />
+      {picking ? (
+        <>
+          <Hint label="Back" keys={<Kbd>⌫</Kbd>} onPress={onBack} />
+          <span className="flex-1" />
+          <Hint label="Select" keys={<Kbd>↵</Kbd>} onPress={onSelect} />
+        </>
       ) : (
-        canChangeType && (
+        <>
+          {canDropFilter ? (
+            <Hint label="Remove filter" keys={<Kbd>⌫</Kbd>} onPress={onBack} />
+          ) : (
+            canChangeType && (
+              <Hint
+                label="Change type"
+                keys={
+                  <>
+                    <Kbd>←</Kbd>
+                    <Kbd>→</Kbd>
+                  </>
+                }
+              />
+            )
+          )}
+          {canFilter && (
+            <Hint label="Filters" keys={<Kbd>/</Kbd>} onPress={onFilters} />
+          )}
           <Hint
-            label="Change type"
-            keys={
-              <>
-                <Kbd>←</Kbd>
-                <Kbd>→</Kbd>
-              </>
-            }
+            label="Actions"
+            keys={<HotkeyKeys hotkey="Alt+Enter" className="gap-0.5" />}
+            onPress={onActions}
+            disabled={!hasActions}
           />
-        )
+          <span className="flex-1" />
+          <Hint label="Compose" keys={<Kbd>Tab</Kbd>} onPress={onCompose} />
+        </>
       )}
-      <Hint
-        label="Actions"
-        keys={<HotkeyKeys hotkey="Alt+Enter" className="gap-0.5" />}
-        onPress={onActions}
-        disabled={!hasActions}
-      />
-      <span className="flex-1" />
-      <Hint label="Compose" keys={<Kbd>Tab</Kbd>} onPress={onCompose} />
     </div>
   );
 }

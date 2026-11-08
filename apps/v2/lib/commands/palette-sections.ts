@@ -196,25 +196,40 @@ export function allSections(
   return indexSections([...ranked, deepSection(sources, deep)]);
 }
 
+/** All with filters on and nothing typed: everything that passes, chats
+ *  grouped like the sidebar and artifacts after them. Recents would only
+ *  show eight of what you just asked for. */
+export function filteredSections(
+  sources: PaletteSources,
+  library: ThreadSummary[],
+): PaletteSection[] {
+  return indexSections([
+    ...groupThreads(library).map(([label, items]) => ({
+      key: `group:${label}`,
+      label,
+      items: items.map((thread) => threadItem(sources, thread)),
+    })),
+    {
+      key: "artifacts",
+      label: "Artifacts",
+      items: artifactItems(sources.artifacts),
+    },
+  ]);
+}
+
 /** Chats: the library grouped like the sidebar, or a query's matches grouped
- *  the same way. A folder scope narrows either to that folder's chats. */
+ *  the same way. Filters have already narrowed both upstream. */
 export function chatSections(
   sources: PaletteSources,
   library: ThreadSummary[],
   matches: PaletteMatches | null,
   deep: Array<{ thread: ThreadSummary; excerpt: string }>,
-  folderId: string | null,
 ): PaletteSection[] {
-  const inScope = (thread: ThreadSummary) =>
-    folderId === null || thread.folderId === folderId;
   const groups = matches
     ? bucketMatches(
-        matches.chats
-          .map(({ value }) => value)
-          .filter(inScope)
-          .slice(0, MAX_CHAT_RESULTS),
+        matches.chats.map(({ value }) => value).slice(0, MAX_CHAT_RESULTS),
       )
-    : groupThreads(library.filter(inScope));
+    : groupThreads(library);
   return indexSections([
     ...groups.map(([label, items]) => ({
       key: `group:${label}`,

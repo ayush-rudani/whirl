@@ -42,9 +42,10 @@ const PALETTE_ROWS: SheetRow[] = [
     hotkey: ["ArrowLeft", "ArrowRight"],
     idle: false,
   },
+  { id: "palette.filters", name: "Filters", hotkey: "/", idle: false },
+  { id: "palette.back", name: "Remove last filter", hotkey: "Backspace", idle: false },
   { id: "palette.actions", name: "Chat actions", hotkey: "Alt+Enter", idle: false },
   { id: "palette.compose", name: "Compose from search", hotkey: "Tab", idle: false },
-  { id: "palette.back", name: "Leave a folder", hotkey: "Backspace", idle: false },
 ];
 
 /* Everything the registry declares, grouped in declaration order, with the

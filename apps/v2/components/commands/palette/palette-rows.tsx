@@ -2,11 +2,7 @@
 
 import { memo, type ReactNode } from "react";
 import {
-  IconAppWindowFilled,
-  IconChartBubbleFilled,
   IconCornerDownLeft,
-  IconFileCodeFilled,
-  IconFileTextFilled,
   IconFolderFilled,
   IconLoader2,
   IconLockFilled,
@@ -16,7 +12,7 @@ import {
 import type { Hotkey } from "@tanstack/react-hotkeys";
 
 import { HotkeyKeys } from "@/components/ui/kbd";
-import type { ArtifactSummary, PaletteItem } from "@/lib/commands/palette";
+import { ARTIFACT_KINDS, type PaletteItem } from "@/lib/commands/palette";
 import { MASK_TEXT } from "@/lib/replay-guard";
 import { cn } from "@/lib/utils";
 
@@ -165,13 +161,6 @@ export const FolderResultRow = memo(function FolderResultRow({
   );
 });
 
-const ARTIFACT_ICONS: Record<ArtifactSummary["kind"], TablerIcon> = {
-  document: IconFileTextFilled,
-  code: IconFileCodeFilled,
-  page: IconAppWindowFilled,
-  chart: IconChartBubbleFilled,
-};
-
 export const ArtifactResultRow = memo(function ArtifactResultRow({
   item,
   ...row
@@ -180,7 +169,7 @@ export const ArtifactResultRow = memo(function ArtifactResultRow({
   return (
     <RowFrame
       {...row}
-      icon={ARTIFACT_ICONS[artifact.kind]}
+      icon={ARTIFACT_KINDS[artifact.kind].icon}
       aside={
         row.active ? (
           <EnterHint />
@@ -223,6 +212,70 @@ export const CommandResultRow = memo(function CommandResultRow({
     >
       <span className="min-w-0 flex-1 truncate text-left">
         {item.command.label}
+      </span>
+    </RowFrame>
+  );
+});
+
+/* "Filter by [Date]" — one row per filter in the "/" picker, wearing the
+   value it's already set to on the right. */
+export const FilterResultRow = memo(function FilterResultRow({
+  item,
+  ...row
+}: RowProps & { item: Extract<PaletteItem, { kind: "filter" }> }) {
+  const { filter, current } = item;
+  return (
+    <RowFrame
+      {...row}
+      icon={filter.icon}
+      aside={
+        row.active ? (
+          <EnterHint />
+        ) : current ? (
+          <span
+            className={cn(
+              ASIDE,
+              "max-w-[40%] truncate",
+              filter.key === "folder" && MASK_TEXT,
+            )}
+          >
+            {current}
+          </span>
+        ) : null
+      }
+    >
+      <span className="flex min-w-0 flex-1 items-center gap-2 text-left">
+        Filter by
+        <span className="shrink-0 rounded-full px-2 py-0.5 text-xs text-muted-foreground ring-1 ring-border">
+          {filter.label}
+        </span>
+      </span>
+    </RowFrame>
+  );
+});
+
+/* One value of the filter being picked, with how many chats and artifacts
+   it would leave. */
+export const FilterValueRow = memo(function FilterValueRow({
+  item,
+  ...row
+}: RowProps & { item: Extract<PaletteItem, { kind: "filter-value" }> }) {
+  const { option, count, filterKey } = item;
+  return (
+    <RowFrame
+      {...row}
+      icon={option.icon}
+      aside={
+        row.active ? <EnterHint /> : <span className={ASIDE}>{count}</span>
+      }
+    >
+      <span
+        className={cn(
+          "min-w-0 flex-1 truncate text-left",
+          filterKey === "folder" && MASK_TEXT,
+        )}
+      >
+        {option.label}
       </span>
     </RowFrame>
   );

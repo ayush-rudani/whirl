@@ -1,8 +1,16 @@
+import {
+  IconAppWindowFilled,
+  IconChartBubbleFilled,
+  IconFileCodeFilled,
+  IconFileTextFilled,
+  type TablerIcon,
+} from "@tabler/icons-react";
 import type { FunctionReturnType } from "convex/server";
 import type { api } from "@whirl/backend/convex/_generated/api";
 
 import type { FolderSummary } from "@/lib/folders";
 import type { ThreadSummary } from "@/lib/threads";
+import type { FilterDef, FilterKey, FilterOption } from "./palette-filters";
 import type { Command } from "./use-commands";
 
 /* The palette's vocabulary: which kinds of thing it can show, how a result
@@ -24,6 +32,18 @@ export type ArtifactSummary = FunctionReturnType<
   typeof api.historySearch.recentArtifacts
 >[number];
 
+/* How each kind of artifact is drawn and named — shared by its rows and the
+   Type filter, so the two never disagree. */
+export const ARTIFACT_KINDS: Record<
+  ArtifactSummary["kind"],
+  { plural: string; icon: TablerIcon }
+> = {
+  document: { plural: "Documents", icon: IconFileTextFilled },
+  code: { plural: "Code", icon: IconFileCodeFilled },
+  page: { plural: "Pages", icon: IconAppWindowFilled },
+  chart: { plural: "Charts", icon: IconChartBubbleFilled },
+};
+
 export type PaletteItem =
   | {
       kind: "thread";
@@ -43,7 +63,22 @@ export type PaletteItem =
       artifact: ArtifactSummary;
       threadTitle: string;
     }
-  | { kind: "command"; key: string; command: Command };
+  | { kind: "command"; key: string; command: Command }
+  | {
+      kind: "filter";
+      key: string;
+      filter: FilterDef;
+      /** The value this filter is already set to, if any. */
+      current?: string;
+    }
+  | {
+      kind: "filter-value";
+      key: string;
+      filterKey: FilterKey;
+      option: FilterOption;
+      /** Chats and artifacts left if this value were picked. */
+      count: number;
+    };
 
 export type PaletteSection = {
   key: string;

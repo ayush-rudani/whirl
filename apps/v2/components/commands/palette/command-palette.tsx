@@ -9,7 +9,7 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
-import { IconFolderFilled, IconSearch, IconX } from "@tabler/icons-react";
+import { IconSearch } from "@tabler/icons-react";
 import { motion } from "motion/react";
 
 import { StoreTabs } from "@/components/integrations/store-tabs";
@@ -24,6 +24,13 @@ import {
   type PaletteType,
 } from "@/lib/commands/palette";
 import {
+  FILTER_DEFS,
+  withFilter,
+  type FilterKey,
+  type FilterMenu,
+  type PaletteFilter,
+} from "@/lib/commands/palette-filters";
+import {
   flushOverlayAction,
   runAfterOverlay,
   setKeyboardOverlay,
@@ -34,13 +41,10 @@ import { usePaletteResults } from "@/lib/commands/use-palette-results";
 import { fillComposer } from "@/lib/composer-ingest";
 import { getComposerDraft } from "@/lib/composer-draft";
 import { useIncognitoState } from "@/lib/incognito";
-import { MASK_TEXT } from "@/lib/replay-guard";
-import { cn } from "@/lib/utils";
 import { useView } from "@/lib/view";
+import { FilterChips } from "./filter-chips";
 import { PaletteFooter } from "./palette-footer";
 import { PaletteList } from "./palette-list";
-
-type FolderScope = { id: string; name: string };
 
 const PLACEHOLDERS: Record<PaletteType, string> = {
   all: "Search chats or run a command…",
@@ -64,8 +68,9 @@ const MENU_TRIGGER =
 /* The ⌘K palette: one instance for the whole shell, opened through
    lib/commands/overlays.ts by the hotkey, the sidebar's Search row and the
    phone's History button alike. Type tabs narrow it to chats, folders,
-   artifacts or actions; a folder opens into its own chats; the highlighted
-   chat carries its ⋯ menu; Tab hands the query to the composer.
+   artifacts or actions; "/" opens filters (date, folder, model, status,
+   type) that stack as chips; the highlighted chat carries its ⋯ menu; Tab
+   hands the query to the composer.
 
    The body height morphs to fit the results: a ResizeObserver measures the
    (max-h capped) scroller and the motion wrapper animates toward it, so
@@ -79,7 +84,9 @@ export function CommandPalette() {
 
   const [value, setValue] = useState("");
   const [type, setType] = useState<PaletteType>("all");
-  const [scope, setScope] = useState<FolderScope | null>(null);
+  const [filters, setFilters] = useState<PaletteFilter[]>([]);
+  /* The filter whose values are being picked, after "/" chose one. */
+  const [picking, setPicking] = useState<FilterKey | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -87,11 +94,25 @@ export function CommandPalette() {
   const [height, setHeight] = useState<number | "auto">("auto");
 
   const query = value.trim().toLowerCase();
+
+  /* "/" at the start of the field opens the filter picker; choosing a
+     filter there lists its values. Incognito and the Actions tab have
+     nothing to filter. */
+  const canFilter = !incognito && type !== "actions";
+  const filterMenu: FilterMenu | null = !canFilter
+    ? null
+    : picking
+      ? { step: "values", key: picking, query }
+      : value.startsWith("/")
+        ? { step: "keys", query: value.slice(1).trim().toLowerCase() }
+        : null;
+
   const results = usePaletteResults({
     open,
-    query,
+    query: filterMenu ? "" : query,
     type,
-    folderId: scope?.id ?? null,
+    filters,
+    filterMenu,
     incognito,
     commands,
   });
@@ -120,7 +141,8 @@ export function CommandPalette() {
   const resetAfterClose = () => {
     setValue("");
     setType("all");
-    setScope(null);
+    setFilters([]);
+    setPicking(null);
     setActiveIndex(0);
     setMenuOpen(false);
     setHeight("auto");
@@ -138,7 +160,7 @@ export function CommandPalette() {
 
   const changeType = (next: PaletteType) => {
     setType(next);
-    setScope(null);
+    setPicking(null);
     highlight(0);
     inputRef.current?.focus();
   };
@@ -149,9 +171,42 @@ export function CommandPalette() {
     changeType(PALETTE_TYPES[next].value);
   };
 
-  const leaveScope = () => {
-    setScope(null);
+  /* Puts a filter in force (replacing one of the same kind) and lands on a
+     tab that shows what it narrows — folders and actions have nothing to
+     filter, so those hop to All unless the caller names a tab. */
+  const applyFilter = (next: PaletteFilter, landOn?: PaletteType) => {
+    setFilters((current) => withFilter(current, next));
+    setPicking(null);
+    if (landOn) setType(landOn);
+    else if (type === "folders" || type === "actions") setType("all");
     changeQuery("");
+    inputRef.current?.focus();
+  };
+
+  const removeFilter = (key: FilterKey) => {
+    setFilters((current) => current.filter((filter) => filter.key !== key));
+    setActiveIndex(0);
+    inputRef.current?.focus();
+  };
+
+  const openFilters = () => {
+    setPicking(null);
+    changeQuery("/");
+    inputRef.current?.focus();
+  };
+
+  /* Backspace in an empty field (and the footer's Back): out of a filter's
+     values to the list of filters, out of that list to the results, or
+     else the last filter off. */
+  const stepBack = () => {
+    if (picking) {
+      setPicking(null);
+      changeQuery("/");
+    } else if (value.startsWith("/")) {
+      changeQuery("");
+    } else if (filters.length > 0) {
+      removeFilter(filters[filters.length - 1].key);
+    }
     inputRef.current?.focus();
   };
 
@@ -179,9 +234,13 @@ export function CommandPalette() {
         onOpenChange(false);
         view.openThread(item.thread.id);
         return;
+      /* A folder opens as a Folder filter over its chats — the same chip
+         "/" would make, so the rest of the filters stack on top of it. */
       case "folder":
-        setScope({ id: item.folder.id, name: item.folder.name });
-        changeQuery("");
+        applyFilter(
+          { key: "folder", value: item.folder.id, label: item.folder.name },
+          "chats",
+        );
         return;
       case "artifact": {
         const { artifact } = item;
@@ -200,6 +259,17 @@ export function CommandPalette() {
       }
       case "command":
         item.command.run();
+        return;
+      case "filter":
+        setPicking(item.filter.key);
+        changeQuery("");
+        return;
+      case "filter-value":
+        applyFilter({
+          key: item.filterKey,
+          value: item.option.value,
+          label: item.option.label,
+        });
         return;
     }
   };
@@ -241,16 +311,18 @@ export function CommandPalette() {
         if (event.altKey) openActions();
         else choose(index);
         return;
+      /* Tab completes in the filter picker, and composes everywhere else. */
       case "Tab":
         if (event.shiftKey) return;
         event.preventDefault();
-        compose();
+        if (filterMenu) choose(index);
+        else compose();
         return;
       /* Arrows switch type only once the caret can't move any further, so
          editing the query still works the way it always does. */
       case "ArrowLeft":
       case "ArrowRight": {
-        if (scope || incognito || caretAt === null) return;
+        if (filterMenu || incognito || caretAt === null) return;
         if (event.altKey || event.metaKey || event.ctrlKey || event.shiftKey)
           return;
         const left = event.key === "ArrowLeft";
@@ -260,9 +332,9 @@ export function CommandPalette() {
         return;
       }
       case "Backspace":
-        if (scope && value === "") {
+        if (value === "" && (picking || filters.length > 0)) {
           event.preventDefault();
-          leaveScope();
+          stepBack();
         }
         return;
     }
@@ -294,8 +366,20 @@ export function CommandPalette() {
   }, [bodyEl, index]);
 
   const emptyLabel = (() => {
+    if (filterMenu?.step === "keys") {
+      return `No filter called "${value.slice(1).trim()}"`;
+    }
+    if (filterMenu?.step === "values") {
+      const label = FILTER_DEFS[filterMenu.key].label.toLowerCase();
+      return query
+        ? `No ${label} matches "${value.trim()}"`
+        : `Nothing to filter by ${label} yet`;
+    }
+    if (filters.length > 0 && (type === "folders" || type === "actions")) {
+      return "Filters narrow chats and artifacts — try All, Chats or Artifacts";
+    }
     if (query) return `${NO_MATCH[incognito ? "actions" : type]} "${value.trim()}"`;
-    if (scope) return "This folder is empty";
+    if (filters.length > 0) return "Nothing matches these filters";
     if (type === "artifacts") {
       if (results.artifactsFailed)
         return "Couldn't load your artifacts right now. Try again in a moment.";
@@ -308,8 +392,8 @@ export function CommandPalette() {
     return "No chats yet";
   })();
 
-  const placeholder = scope
-    ? `Search ${scope.name}…`
+  const placeholder = picking
+    ? `Choose a ${FILTER_DEFS[picking].label.toLowerCase()}…`
     : incognito
       ? "Run a command…"
       : PLACEHOLDERS[type];
@@ -341,21 +425,7 @@ export function CommandPalette() {
         <div className="border-b border-border">
           <div className="flex h-12 items-center gap-2.5 px-4">
             <IconSearch size={16} className="shrink-0 text-muted-foreground" />
-            {scope && (
-              <button
-                type="button"
-                onClick={leaveScope}
-                aria-label={`Leave ${scope.name}`}
-                className="group flex h-6 max-w-[40%] shrink-0 cursor-pointer items-center gap-1 rounded-md bg-accent px-1.5 text-xs font-medium text-accent-foreground"
-              >
-                <IconFolderFilled size={12} className="shrink-0 text-muted-foreground" />
-                <span className={cn("truncate", MASK_TEXT)}>{scope.name}</span>
-                <IconX
-                  size={11}
-                  className="shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
-                />
-              </button>
-            )}
+            <FilterChips filters={filters} onRemove={removeFilter} />
             <input
               ref={inputRef}
               value={value}
@@ -366,9 +436,9 @@ export function CommandPalette() {
             />
             <Kbd>Esc</Kbd>
           </div>
-          {/* Incognito has nothing to filter — commands are all it shows —
-              and a folder scope already says where you are. */}
-          {!incognito && !scope && (
+          {/* Incognito has nothing to switch between — commands are all
+              it shows. */}
+          {!incognito && (
             <StoreTabs
               value={type}
               onChange={changeType}
@@ -425,11 +495,15 @@ export function CommandPalette() {
         </motion.div>
 
         <PaletteFooter
-          scoped={scope !== null}
+          picking={filterMenu !== null}
+          canDropFilter={value === "" && filters.length > 0}
           canChangeType={!incognito}
+          canFilter={canFilter}
           hasActions={activeItem?.kind === "thread"}
           onClose={() => onOpenChange(false)}
-          onBack={leaveScope}
+          onBack={stepBack}
+          onFilters={openFilters}
+          onSelect={() => choose(index)}
           onActions={openActions}
           onCompose={compose}
         />

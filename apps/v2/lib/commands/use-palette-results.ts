@@ -7,13 +7,25 @@ import { api } from "@whirl/backend/convex/_generated/api";
 
 import { useFolders, type FolderSummary } from "@/lib/folders";
 import { useOpenedTitles } from "@/lib/locked/thread-lock";
+import { useComposerModels } from "@/lib/model-catalog";
 import { useThreads, type ThreadSummary } from "@/lib/threads";
 import type { ArtifactSummary, PaletteSection, PaletteType } from "./palette";
+import {
+  artifactPasses,
+  filterKeySections,
+  filterOptions,
+  filterValueSections,
+  threadPasses,
+  withFilter,
+  type FilterMenu,
+  type PaletteFilter,
+} from "./palette-filters";
 import {
   actionSections,
   allSections,
   artifactSections,
   chatSections,
+  filteredSections,
   folderSections,
   matchPalette,
   recentSections,
@@ -42,11 +54,13 @@ type DeepHit = FunctionReturnType<typeof api.historySearch.deepSearch>[number];
    don't see a "new" empty list on every render. */
 const NO_DEEP_HITS: DeepHit[] = [];
 const NO_ARTIFACTS: ArtifactSummary[] = [];
+const NO_COMMANDS: Command[] = [];
 
 export type PaletteResults = {
   sections: PaletteSection[];
   itemCount: number;
-  /** Per-tab match counts for the chips, only while a query is typed. */
+  /** Per-tab counts for the chips, while a query or a filter narrows
+   *  things. */
   counts: Partial<Record<PaletteType, number>>;
   /** The chat list itself hasn't arrived yet. */
   loadingChats: boolean;
@@ -60,8 +74,10 @@ export type PaletteResults = {
   folders: FolderSummary[];
 };
 
-/* Everything the palette shows, for one query on one tab. Owns the
-   subscriptions and their timing; the section builders decide the layout.
+/* Everything the palette shows, for one query on one tab under the filters
+   in force — or the filter picker itself while one is being chosen. Owns
+   the subscriptions and their timing; the section builders decide the
+   layout.
 
    Long-session care, since the palette stays mounted for the life of the
    tab: the full library, the deep query and the artifact subscription all
@@ -71,7 +87,8 @@ export function usePaletteResults({
   open,
   query,
   type,
-  folderId,
+  filters,
+  filterMenu,
   incognito,
   commands,
 }: {
@@ -79,8 +96,9 @@ export function usePaletteResults({
   /** Trimmed and lowercased. */
   query: string;
   type: PaletteType;
-  /** Set while drilled into a folder: Chats, narrowed to it. */
-  folderId: string | null;
+  filters: readonly PaletteFilter[];
+  /** Set while a filter is being picked; the list shows the picker. */
+  filterMenu: FilterMenu | null;
   incognito: boolean;
   commands: Command[];
 }): PaletteResults {
@@ -90,6 +108,7 @@ export function usePaletteResults({
      and for the row label, so the two can't disagree. */
   const openedTitles = useOpenedTitles(threads);
   const folders = useFolders(isAuthenticated) ?? EMPTY_FOLDERS;
+  const models = useComposerModels();
 
   /* Incognito keeps the commands but drops the history — that's exactly
      what the mode isn't, and a hop to a saved thread would torch the
@@ -135,7 +154,9 @@ export function usePaletteResults({
   const wantsDeep =
     engaged &&
     Boolean(query) &&
-    folderId === null &&
+    filterMenu === null &&
+    /* A Type filter is artifacts-only — no chat could survive it. */
+    !filters.some((filter) => filter.key === "type") &&
     (effectiveType === "all" || effectiveType === "chats");
   useEffect(() => {
     if (!wantsDeep) return;
@@ -180,13 +201,17 @@ export function usePaletteResults({
   const deepSettled =
     wantsDeep && liveDeepQuery === query && deepHits !== undefined;
 
-  const sources = useMemo((): PaletteSources => {
+  /* Everything there is, before any filter. */
+  const everything = useMemo((): PaletteSources & {
+    byId: Map<string, ThreadSummary>;
+  } => {
     const list = threads ?? [];
     const byId = new Map(list.map((thread) => [thread.id, thread]));
     const titleOf = (thread: ThreadSummary) =>
       openedTitles.get(thread.id) ?? thread.title;
     return {
       threads: list,
+      byId,
       titleOf,
       folders,
       folderNames: new Map(folders.map((folder) => [folder.id, folder.name])),
@@ -200,6 +225,25 @@ export function usePaletteResults({
     };
   }, [threads, openedTitles, folders, artifacts, commands]);
 
+  /* Filters narrow the sources once, up front, so every tab, count and
+     section downstream already sees only what passes. Folders and actions
+     have nothing to filter on, so they bow out while any filter is on. */
+  const sources = useMemo((): PaletteSources => {
+    if (filters.length === 0) return everything;
+    return {
+      ...everything,
+      threads: everything.threads.filter((thread) =>
+        threadPasses(thread, filters),
+      ),
+      artifacts: everything.artifacts.filter(({ artifact }) => {
+        const thread = everything.byId.get(artifact.threadId);
+        return thread !== undefined && artifactPasses(artifact, thread, filters);
+      }),
+      folders: EMPTY_FOLDERS,
+      commands: NO_COMMANDS,
+    };
+  }, [everything, filters]);
+
   const matches = useMemo(
     () => (query ? matchPalette(sources, query) : null),
     [sources, query],
@@ -207,33 +251,67 @@ export function usePaletteResults({
 
   /* Deep hits arrive as thread ids — resolve them against the loaded list
      and drop anything the title matches already cover. */
+  /* Deep hits arrive as thread ids — resolve them against the (filtered)
+     list and drop anything the title matches already cover. */
   const deep = useMemo(() => {
-    if (!deepSettled || !deepHits || !threads) return [];
+    if (!deepSettled || !deepHits) return [];
     const titleHits = new Set(matches?.chats.map(({ value }) => value.id));
-    const byId = new Map(threads.map((thread) => [thread.id, thread]));
+    const passing = new Map(
+      sources.threads.map((thread) => [thread.id, thread]),
+    );
     return deepHits.flatMap((hit) => {
-      const thread = byId.get(hit.threadId);
+      const thread = passing.get(hit.threadId);
       return thread && !titleHits.has(hit.threadId)
         ? [{ thread, excerpt: hit.excerpt }]
         : [];
     });
-  }, [deepSettled, deepHits, threads, matches]);
+  }, [deepSettled, deepHits, sources, matches]);
+
+  /* The picker: a filter's values are counted against everything, with the
+     other filters in force and this value swapped in. */
+  const menuSections = useMemo((): PaletteSection[] | null => {
+    if (!filterMenu) return null;
+    if (filterMenu.step === "keys") {
+      return filterKeySections(filterMenu.query, filters);
+    }
+    const { key } = filterMenu;
+    const modelNames = new Map(models.map((model) => [model.key, model.name]));
+    const options = filterOptions(key, {
+      threads: everything.threads,
+      folders: everything.folders,
+      modelName: (model) => modelNames.get(model) ?? model,
+    });
+    return filterValueSections(key, filterMenu.query, options, (option) => {
+      const trial = withFilter(filters, {
+        key,
+        value: option.value,
+        label: option.label,
+      });
+      let total = 0;
+      for (const thread of everything.threads) {
+        if (threadPasses(thread, trial)) total += 1;
+      }
+      for (const { artifact } of everything.artifacts) {
+        const thread = everything.byId.get(artifact.threadId);
+        if (thread && artifactPasses(artifact, thread, trial)) total += 1;
+      }
+      return total;
+    });
+  }, [filterMenu, filters, models, everything]);
 
   const sections = useMemo((): PaletteSection[] => {
-    if (folderId !== null) {
-      return chatSections(sources, sources.threads, matches, [], folderId);
-    }
+    if (menuSections) return menuSections;
+    const library = fullLibrary
+      ? sources.threads
+      : sources.threads.slice(0, FIRST_PAINT_ROWS);
     switch (effectiveType) {
       case "all":
-        return matches
-          ? allSections(sources, matches, deep)
+        if (matches) return allSections(sources, matches, deep);
+        return filters.length > 0
+          ? filteredSections(sources, library)
           : recentSections(sources);
-      case "chats": {
-        const library = fullLibrary
-          ? sources.threads
-          : sources.threads.slice(0, FIRST_PAINT_ROWS);
-        return chatSections(sources, library, matches, deep, null);
-      }
+      case "chats":
+        return chatSections(sources, library, matches, deep);
       case "folders":
         return folderSections(sources, matches);
       case "artifacts":
@@ -241,7 +319,15 @@ export function usePaletteResults({
       case "actions":
         return actionSections(sources, matches);
     }
-  }, [sources, matches, deep, effectiveType, folderId, fullLibrary]);
+  }, [
+    menuSections,
+    sources,
+    matches,
+    deep,
+    effectiveType,
+    filters,
+    fullLibrary,
+  ]);
 
   const itemCount = sections.reduce(
     (total, section) => total + section.items.length,
@@ -249,14 +335,22 @@ export function usePaletteResults({
   );
 
   const counts = useMemo((): Partial<Record<PaletteType, number>> => {
-    if (!matches) return {};
+    if (matches) {
+      return {
+        chats: matches.chats.length,
+        folders: matches.folders.length,
+        artifacts: matches.artifacts.length,
+        actions: matches.actions.length,
+      };
+    }
+    if (filters.length === 0) return {};
     return {
-      chats: matches.chats.length,
-      folders: matches.folders.length,
-      artifacts: matches.artifacts.length,
-      actions: matches.actions.length,
+      chats: sources.threads.length,
+      folders: 0,
+      artifacts: sources.artifacts.length,
+      actions: 0,
     };
-  }, [matches]);
+  }, [matches, filters, sources]);
 
   /* When the "Searching deeper" notice shows: straight away when nothing
      else came up (it owns the empty-state slot), otherwise only once the

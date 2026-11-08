@@ -9,6 +9,8 @@ import { pinRasterPath } from "@/lib/motion";
 import {
   ArtifactResultRow,
   CommandResultRow,
+  FilterResultRow,
+  FilterValueRow,
   FolderResultRow,
   SearchingDeeper,
   ThreadResultRow,
@@ -78,6 +80,10 @@ export function PaletteList({
             {...row}
           />
         );
+      case "filter":
+        return <FilterResultRow key={item.key} item={item} {...row} />;
+      case "filter-value":
+        return <FilterValueRow key={item.key} item={item} {...row} />;
     }
   };
 
