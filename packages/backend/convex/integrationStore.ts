@@ -443,6 +443,12 @@ export const startComposioConnect = action({
     if (!listing?.composio) {
       throw new Error("That integration isn't available right now.");
     }
+    /* No-auth toolkits have no auth config to connect through — and no
+       account to connect in the first place. */
+    const { authConfigId } = listing.composio;
+    if (!authConfigId) {
+      throw new Error("This integration doesn't need a sign-in.");
+    }
 
     const siteUrl = process.env.CONVEX_SITE_URL;
     if (!siteUrl) throw new Error("CONVEX_SITE_URL is not configured.");
@@ -451,7 +457,7 @@ export const startComposioConnect = action({
     const callbackUrl = `${siteUrl}/composio/oauth/callback?server=${args.id}`;
 
     const link = await createComposioConnectLink(
-      listing.composio.authConfigId,
+      authConfigId,
       identity.subject,
       callbackUrl,
     );

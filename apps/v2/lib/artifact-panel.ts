@@ -40,6 +40,47 @@ export function openHtmlPanel(htmlId: string) {
   set({ ...state, target: { kind: "html", htmlId } });
 }
 
+/* An artifact asked for from another thread (the palette's Artifacts list).
+   Hopping threads closes the panel, so it can't just open now — it waits
+   here until the chat face lands on its thread (settleArtifactPanel). One
+   slot: a newer request replaces an older one that never landed. */
+let queued: { threadId: string; target: ArtifactPanelTarget } | null = null;
+
+/** Opens an artifact in its own thread: right away if that thread is the one
+ *  showing, otherwise once `navigate` has taken the chat face there. */
+export function openArtifactInThread(
+  threadId: string,
+  target: ArtifactPanelTarget,
+  { currentThreadId, navigate }: {
+    currentThreadId: string | null;
+    navigate: (threadId: string) => void;
+  },
+) {
+  if (currentThreadId === threadId) {
+    queued = null;
+    set({ ...state, target });
+    autoOpened.add(target.kind === "document" ? target.documentId : target.htmlId);
+    return;
+  }
+  queued = { threadId, target };
+  navigate(threadId);
+}
+
+/** The chat face calls this whenever its thread changes: the panel belongs
+ *  to the conversation that opened it, so it closes — unless an artifact
+ *  was queued for exactly this thread, which opens instead. */
+export function settleArtifactPanel(threadId: string | null) {
+  const next = queued !== null && queued.threadId === threadId ? queued : null;
+  queued = null;
+  if (next) {
+    const { target } = next;
+    autoOpened.add(target.kind === "document" ? target.documentId : target.htmlId);
+    set({ target, fullscreen: false });
+    return;
+  }
+  closeArtifactPanel();
+}
+
 export function closeArtifactPanel() {
   if (state.target === null && !state.fullscreen) return;
   set({ target: null, fullscreen: false });

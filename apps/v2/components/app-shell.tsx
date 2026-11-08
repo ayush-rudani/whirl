@@ -14,9 +14,10 @@ import { SECTION_TITLES } from "@/lib/settings-sections";
 import { useThreads } from "@/lib/threads";
 import { useView } from "@/lib/view";
 import { ChatView } from "./chat-view";
+import { KeyboardLayer } from "./commands/keyboard-layer";
 import { HistoryView } from "./mobile/history-view";
 import { MobileTabBar } from "./mobile/tab-bar";
-import { IncognitoJanitor } from "./incognito-toggle";
+import { IncognitoExitConfirm, IncognitoJanitor } from "./incognito-toggle";
 import { OpenSourceAnnouncement } from "./open-source/open-source-announcement";
 import { PageSlide } from "./page-slide";
 import { Sidebar } from "./sidebar";
@@ -211,26 +212,29 @@ export function AppShell({ children }: { children?: React.ReactNode }) {
        `app-frame` is what app/mobile.css hangs the touch shell off: the
        height that yields to an on-screen keyboard, and the document
        scrolling that gets switched off underneath it. */
-    <div className="app-frame flex h-dvh w-full flex-col bg-background md:flex-row">
-      <Sidebar />
-      <main className="raised relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface md:my-2 md:mr-2 md:rounded-lg md:border md:border-border">
-        <UsageMultiplierBanner />
-        <PageSlide
-          page={awayFace === null ? 1 : 2}
-          className="min-h-0 flex-1"
-          pageClassName="flex flex-col"
-          one={<ChatView activeThread={activeThread} />}
-          two={<AwayFace target={awayFace} />}
-        />
-      </main>
-      <MobileTabBar />
-      <Toaster />
-      <LockDialogs />
-      <IncognitoJanitor />
-      <ResetNoticeDialog enabled={isAuthenticated} />
-      <OpenSourceAnnouncement />
-      <DeploymentWatcher />
-      {children}
-    </div>
+    <KeyboardLayer>
+      <div className="app-frame flex h-dvh w-full flex-col bg-background md:flex-row">
+        <Sidebar />
+        <main className="raised relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-surface md:my-2 md:mr-2 md:rounded-lg md:border md:border-border">
+          <UsageMultiplierBanner />
+          <PageSlide
+            page={awayFace === null ? 1 : 2}
+            className="min-h-0 flex-1"
+            pageClassName="flex flex-col"
+            one={<ChatView activeThread={activeThread} />}
+            two={<AwayFace target={awayFace} />}
+          />
+        </main>
+        <MobileTabBar />
+        <Toaster />
+        <LockDialogs />
+        <IncognitoJanitor />
+        <IncognitoExitConfirm />
+        <ResetNoticeDialog enabled={isAuthenticated} />
+        <OpenSourceAnnouncement />
+        <DeploymentWatcher />
+        {children}
+      </div>
+    </KeyboardLayer>
   );
 }

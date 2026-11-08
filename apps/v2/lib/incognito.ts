@@ -46,6 +46,41 @@ export function useIncognitoState(): IncognitoState {
   );
 }
 
+/* Whether the "Leave incognito?" confirm is up. Its own little store so the
+   ghost button, the palette and the hotkey all share the one dialog
+   (IncognitoExitConfirm, mounted once by the shell) instead of each
+   carrying a copy. */
+let confirmingExit = false;
+const confirmListeners = new Set<() => void>();
+
+function subscribeConfirm(listener: () => void) {
+  confirmListeners.add(listener);
+  return () => confirmListeners.delete(listener);
+}
+
+export function setIncognitoExitConfirm(open: boolean) {
+  if (open === confirmingExit) return;
+  confirmingExit = open;
+  for (const listener of confirmListeners) listener();
+}
+
+export function useIncognitoExitConfirm(): boolean {
+  return useSyncExternalStore(
+    subscribeConfirm,
+    () => confirmingExit,
+    () => false,
+  );
+}
+
+/** Leaving mid-chat deletes it — that deserves a beat of hesitation. With
+ *  nothing sent yet there's nothing to lose (and nothing to purge), so this
+ *  just slips out. */
+export function requestIncognitoExit() {
+  if (!state.enabled) return;
+  if (state.threadId) setIncognitoExitConfirm(true);
+  else set(OFF);
+}
+
 /** First send latches the freshly created thread; later sends reuse it. */
 export function latchIncognitoThread(threadId: string) {
   if (state.enabled && state.threadId === null) {

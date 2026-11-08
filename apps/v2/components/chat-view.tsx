@@ -5,7 +5,7 @@ import { useConvexAuth } from "convex/react";
 import { ConvexError } from "convex/values";
 import { AnimatePresence, motion } from "motion/react";
 
-import { closeArtifactPanel } from "@/lib/artifact-panel";
+import { settleArtifactPanel } from "@/lib/artifact-panel";
 import type { AttachmentUpload } from "@/lib/attachments";
 import { setComposerDraft } from "@/lib/composer-draft";
 import {
@@ -13,7 +13,10 @@ import {
   stashComposerPrefill,
   takeComposerPrefill,
 } from "@/lib/composer-prefill";
-import { registerQuoteInsert } from "@/lib/composer-ingest";
+import {
+  registerComposerFill,
+  registerQuoteInsert,
+} from "@/lib/composer-ingest";
 import { claimSharedText } from "@/lib/share-target";
 import {
   latchIncognitoThread,
@@ -489,9 +492,10 @@ export function ChatView({
   const inRoutedThread = routeThreadId !== null;
 
   /* Hopping threads (or heading home) drops the artifact panel — it
-     belongs to the conversation that opened it. */
+     belongs to the conversation that opened it. The one exception is an
+     artifact the palette asked for in the thread being hopped to. */
   useEffect(() => {
-    closeArtifactPanel();
+    settleArtifactPanel(threadId);
   }, [threadId]);
 
   /* The document panel's "Add to chat" lands its quoted selection here —
@@ -513,6 +517,21 @@ export function ChatView({
       return true;
     });
     return () => registerQuoteInsert(null);
+  }, []);
+
+  /* The palette's Compose: its query becomes the whole draft, caret at the
+     end, ready to send or keep typing. */
+  useEffect(() => {
+    registerComposerFill((text) => {
+      setComposerDraft(text);
+      requestAnimationFrame(() => {
+        const el = composerRef.current;
+        if (!el) return;
+        el.focus();
+        el.setSelectionRange(el.value.length, el.value.length);
+      });
+    });
+    return () => registerComposerFill(null);
   }, []);
 
   return (

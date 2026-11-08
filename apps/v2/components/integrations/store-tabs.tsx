@@ -21,6 +21,7 @@ export function StoreTabs<T extends string>({
   tabs,
   className,
   glide = true,
+  layoutId = "store-tab-chip",
 }: {
   value: T;
   onChange: (value: T) => void;
@@ -30,6 +31,9 @@ export function StoreTabs<T extends string>({
    *  for a set that scrolls: the pill would fly across the ones in between,
    *  and it animates against a scroll offset that moves underneath it. */
   glide?: boolean;
+  /** Names the gliding fill. Two sets on screen at once (the store behind
+   *  the ⌘K palette) need different ones, or the pill flies between them. */
+  layoutId?: string;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -77,7 +81,7 @@ export function StoreTabs<T extends string>({
           >
             {active && glide && (
               <motion.span
-                layoutId="store-tab-chip"
+                layoutId={layoutId}
                 transition={{ type: "spring", stiffness: 480, damping: 38 }}
                 transformTemplate={pinRasterPath}
                 style={{ borderRadius: 16 }}
