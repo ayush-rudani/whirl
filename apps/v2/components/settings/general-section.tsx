@@ -77,14 +77,14 @@ export function GeneralSection() {
             />
           </SettingsRow>
           <SettingsRow
-            title="Content width"
+            title="Transcript width"
             description="How wide chats stretch on big screens."
           >
             <ChoiceCapsules
               value={width}
               onChange={setWidth}
               options={WIDTH_OPTIONS}
-              aria-label="Content width"
+              aria-label="Transcript width"
             />
           </SettingsRow>
           <SettingsRow
