@@ -16,6 +16,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The convex CLI needs Node 22+ (Node 20 support was dropped in 1.49).
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
