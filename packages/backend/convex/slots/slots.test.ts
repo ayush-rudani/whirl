@@ -628,6 +628,11 @@ describe("guest prize codes", () => {
     });
     const account = await t.withIdentity(identity).query(api.slots.account, {});
     const prizeId = account!.prizes[0]._id;
+    // Like production, convex-test never starts a transaction before the last
+    // commit, rounded up to the next millisecond. With the clock frozen, the
+    // setup commits above would push the activation 1ms past `Date.now()`, so
+    // let a millisecond pass and the activation runs at exactly `Date.now()`.
+    vi.advanceTimersByTime(1);
     await t.mutation(internal.slotRewards.beginInternal, {
       prizeId,
       owner: identity.tokenIdentifier,

@@ -14,7 +14,7 @@
     "@posthog/react": "^1.10.3",
     "@tabler/icons-react": "^3.44.0",
     "@whirl/backend": "workspace:*",
-    "convex": "^1.42.1",
+    "convex": "^1.50.0",
     "motion": "^12.42.2",
     "posthog-js": "^1.399.2",
     "react": "^19.2.7",
