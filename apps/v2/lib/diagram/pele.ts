@@ -61,12 +61,16 @@ export function prepare(code: string): Prepared {
   const pele = loaded;
   if (!pele) return { kind: "pending", until: loadPele() };
 
-  const type = pele.detectType(code);
-  if (type && !pele.registered(type) && !unavailable.has(type)) {
-    return { kind: "pending", until: loadType(pele, type) };
-  }
-
   try {
+    /* detectType throws too, not just parse: front matter that isn't valid
+       YAML (an unclosed quote, tab indents) is a syntax error before the
+       type is even known. Uncaught, it would escape the layout effect and
+       take the whole thread down with it. */
+    const type = pele.detectType(code);
+    if (type && !pele.registered(type) && !unavailable.has(type)) {
+      return { kind: "pending", until: loadType(pele, type) };
+    }
+
     pele.parse(code);
     return { kind: "ready", pele };
   } catch (error) {
