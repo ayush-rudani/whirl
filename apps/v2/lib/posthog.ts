@@ -39,6 +39,9 @@ export const ANALYTICS_EVENTS = {
   integrationSuggestionShown: "integration_suggestion_shown",
   integrationSuggestionClicked: "integration_suggestion_clicked",
   frontendPerformance: "frontend_performance",
+  /* A finished ```mermaid fence that couldn't be drawn. The reason and the
+     diagram type only — never the source, which is conversation content. */
+  diagramRenderFailed: "diagram_render_failed",
   /* The Median support panel. What happens inside it (a conversation, a bug
      report, a resolution) is Median's to count, so this is only the open. */
   supportOpened: "support_opened",

@@ -1,0 +1,68 @@
+/* Diagrams (```mermaid fences, drawn by Pele — components/thread/diagram).
+
+   Pele paints with CSS variables rather than baked-in theme colors, so the
+   whole palette is a mapping onto the app's own tokens. Those tokens already
+   flip under .dark, the accents, and .platinum-page, which means a diagram
+   follows every theme change without being redrawn — and needs no dark block
+   of its own here. lib/diagram/standalone-svg.ts resolves this same list when
+   a diagram is opened on its own; keep the two in step.
+
+   The font is deliberately left unset: Pele falls back to the card's own
+   font (the spelled-out stack on body), which is the one it measures labels
+   with. A var that failed to resolve here would desync measuring and drawing. */
+.t-diagram {
+  --pele-bg: var(--surface);
+  --pele-fg: var(--foreground);
+  --pele-muted: var(--muted-foreground);
+  --pele-line: var(--foreground-soft);
+  --pele-surface: var(--well);
+  --pele-surface-alt: var(--accent);
+  --pele-border: var(--ring);
+  --pele-accent: var(--primary);
+  --pele-critical: var(--destructive);
+  --pele-error: var(--destructive);
+  --pele-radius: 6px;
+
+  /* Ink for fills a diagram picks itself (`style`, `classDef`). Pele chooses
+     whichever contrasts with the fill, so these two don't follow the theme. */
+  --pele-fg-on-light: #141414;
+  --pele-fg-on-dark: #f5f5f5;
+
+  /* Same eight slots, same order as the chart palette — the order is what
+     keeps adjacent series distinguishable under color-vision deficiency. */
+  --pele-series-1: var(--series-1);
+  --pele-series-2: var(--series-2);
+  --pele-series-3: var(--series-3);
+  --pele-series-4: var(--series-4);
+  --pele-series-5: var(--series-5);
+  --pele-series-6: var(--series-6);
+  --pele-series-7: var(--series-7);
+  --pele-series-8: var(--series-8);
+}
+
+.t-diagram-canvas > svg {
+  display: block;
+  margin-inline: auto;
+  /* Pele dims the last drawing while a newer source won't draw. Mid-stream
+     that's just a fence still being written, and once it's finished the card
+     swaps to its own failure state — so the dim only ever flickers. */
+  opacity: 1 !important;
+}
+
+/* Pele's built-in error banner. The card header says it instead, and only
+   after the reply has finished streaming. */
+.t-diagram-canvas > .pele-error {
+  display: none;
+}
+
+/* Zoom controls appear when a diagram has to shrink to fit the column. Their
+   colors already come from the variables above; this adds the hover every
+   other icon button in the app has. Pele styles them inline, hence the
+   !important. */
+.t-diagram .pele-zoom button {
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.t-diagram .pele-zoom button:not(:disabled):hover {
+  background: var(--accent) !important;
+}
