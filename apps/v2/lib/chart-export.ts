@@ -1,6 +1,7 @@
 "use client";
 
 import { formatChartValue, type ChartSpec } from "./chart-spec";
+import { toRgb } from "./css-color";
 
 /* Downloading a chart as a picture.
 
@@ -126,22 +127,6 @@ function textWidth(text: string, size: number, weight = 400): number {
   if (!context) return text.length * size * 0.55;
   context.font = `${weight} ${size}px ${FONT}`;
   return context.measureText(text).width;
-}
-
-/* The app's ink is written in oklch, and getComputedStyle hands oklch back
-   as oklch — a modern color in a file someone may open in anything. Canvas
-   normalizes any color it understands to plain rgb, so the PNG's colors
-   don't depend on what opens it. A color canvas can't parse leaves
-   fillStyle untouched, which the sentinel catches: better the original
-   value than silently inheriting the last one. */
-function toRgb(color: string): string {
-  const context = scratch();
-  if (!context || !color) return color;
-  const SENTINEL = "#123456";
-  context.fillStyle = SENTINEL;
-  context.fillStyle = color;
-  const resolved = context.fillStyle;
-  return resolved === SENTINEL && color !== SENTINEL ? color : resolved;
 }
 
 const SVG_NS = "http://www.w3.org/2000/svg";

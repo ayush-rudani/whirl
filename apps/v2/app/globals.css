@@ -6,6 +6,7 @@
 @import "./accents.css";
 @import "./tint.css";
 @import "./mobile.css";
+@import "./diagram.css";
 
 /* Streamdown builds its markdown UI out of Tailwind utilities that only
    exist in its dist bundle — point the compiler at them or code blocks and
